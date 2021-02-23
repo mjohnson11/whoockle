@@ -43,10 +43,39 @@ class whooData {
      */
   }
 
+  format_for_export() {
+    /**
+     * Formats a new dataframe for export
+     * Columns: Well, Well Position, N GENE CT, RDRP CT, RNASEP CT, RawCall, OverrideCall, Override, FinalCall
+     */
+    this.export_data = [];
+    let simple_columns = ['Well', 'Well Position', 'FinalCall', 'RawCall', 'OverrideCall', 'Override'];
+    for (let d of this.main_data) {
+      let tmp_row = {};
+      for (let c of simple_columns) {
+        tmp_row[c] = d[c];
+      }
+      for (let c of ['N GENE CT', 'RDRP CT', 'RNASEP CT']) {
+        tmp_row[c] = (d[c]) ? d[c].toFixed(1) : 'Undetermined'; // yeilds Undetermined if CT is NaN, the number formatted to one dec. point if not
+      }
+      this.export_data.push(tmp_row);
+    }
+  }
+
   export() {
     /**
      * Exports final calls and CTs of each well
      */
+    this.format_for_export();
+    let output_name = 'Processed_' + this.input_file.name;
+    let a = document.createElement('a');
+    let output_file = new Blob([d3.tsvFormat(this.export_data)], {type: 'text/plain'});
+    
+    a.href= URL.createObjectURL(output_file);
+    a.download = output_name;
+    a.click();
+
+    URL.revokeObjectURL(a.href);
   }
 
   load_file() {
@@ -77,6 +106,7 @@ class whooData {
       if (whoo_DEBUG) console.log('file loaded');
       self.make_main_data();
     }
+    this.input_file = document.getElementById('inputfile').files[0];
     fr.readAsText(document.getElementById('inputfile').files[0]);
   }
 
@@ -131,6 +161,7 @@ class whooData {
      * "FinalCall" - possibly changed by plate failures or overrides
      */
     if (whoo_DEBUG) console.log('in make_main_data()');
+    let self = this;
     this.main_data = [];
     this.plate_errors = [];
     this.plate_warnings = [];
@@ -156,6 +187,7 @@ class whooData {
     this.make_table();
     this.make_summary();
     this.make_svg();
+    d3.select("#whoo_export").on('click', function() { self.export(); });
   }
 
   check_plate_data(sample_data) {
@@ -428,7 +460,6 @@ class whooData {
       return (d.Well==self.highlighted_well);
     });
     d3.select('#well_display').html(well_position);
-    console.log(row_element.offsetTop);
     this.scroll_to_row(row_element);
   }
 
