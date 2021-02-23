@@ -441,11 +441,18 @@ class whooData {
     this.svg = d3.select('#whoo_svg').append('g').attr('class', 'whoo_item'); // one g to hold them all
     this.cycle_scale = d3.scaleLinear().domain([0,45]).range([100,550]);
     this.fluor_scale = d3.scaleLog().domain([100,1000000]).range([285,50]);
+    this.axis_x_scale = d3.scaleLinear().domain([0,1]).range([100,550]);
+    this.axis_y_scale = d3.scaleLinear().domain([0,1]).range([285,50]);
     this.fline = d3.line()
       .x(function(d) { return self.cycle_scale(d.x); })
       .y(function(d) { return (d.y > 100) ? self.fluor_scale(d.y) : self.fluor_scale(100); }); // clipping numbers <1 for log scale
 
+    this.axis_line = d3.line()
+      .x(function(d) { return self.axis_x_scale(d.x); })
+      .y(function(d) { return self.axis_y_scale(d.y); });
+
     // Making cutoff lines
+    let i = 0;
     for (let gene of Object.keys(whoo_gene_colors)) {
       this.svg.append('path')
         .attr('class', 'ct_cutoff')
@@ -453,6 +460,23 @@ class whooData {
         .attr('d', function(d) {
           return self.fline([{'x': 1, 'y': self.CT_cutoffs[gene]}, {'x': 45, 'y': self.CT_cutoffs[gene]}]);
         });
+
+      this.svg.append('path')
+        .attr('class', 'legend_line')
+        .attr('stroke', whoo_gene_colors[gene])
+        .attr('d', function(d) {
+          return self.axis_line([{'x': i*0.3+0.1, 'y': 1.1}, {'x': i*0.3+0.16, 'y': 1.1}]);
+        });
+
+      this.svg.append('text')
+        .attr('class', 'legend_text')
+        .style('fill', whoo_gene_colors[gene])
+        .style('text-align', 'start')
+        .style('alignment-baseline', 'middle')
+        .attr('x', self.axis_x_scale(i*0.3+0.18))
+        .attr('y', self.axis_y_scale(1.1))
+        .html(gene);
+      i += 1;
     }
 
     let row_range = [50, 285]; // defining a variable in order to offset scaleBand locations so ticks match...

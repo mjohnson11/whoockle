@@ -85,8 +85,8 @@ body {
 
 #show_controls {
   position: absolute;
-  top: 25px;
-  left: 300px;
+  top: 35px;
+  left: 250px;
   width: 120px;
   height: 20px;
   font-size: 14px;
@@ -319,6 +319,11 @@ body {
   fill: none;
   stroke-width: 1px;
   stroke-dasharray: 10;
+}
+
+.legend_line {
+  fill: none;
+  stroke-width: 3px;
 }
 
 .whoo_control_on .fluor_path {
