@@ -268,6 +268,7 @@ body {
   border-collapse: collapse;
   text-align: left;
   cursor: default;
+  table-layout:fixed;
 }
 
 #whoo_table_head th {
@@ -285,7 +286,7 @@ body {
 }
 
 #well_row_entry {
-  width: 100px;
+  width: 150px;
   padding: 0px;
 }
 
@@ -294,11 +295,13 @@ body {
 }
 
 .whoo_table_row.clicked_data {
-  border-left: 15px solid blue;
+  border-left: 15px solid #618BE0;
+  color: #FFF;
+  font-weight: bold;
 }
 
 .whoo_table_row:hover {
-  border-left: 5px solid blue;
+  border-left: 5px solid #618BE0;
 }
 
 .whoo_table_row.filtered_out_data {
