@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <!-- FONT
+  –––––––––––––––––––––––––––––––––––––––––––––––––– -->
+  <link href="https://fonts.googleapis.com/css?family=Crimson+Text&display=swap" rel="stylesheet" type="text/css">
+
+  <!-- CSS
+  –––––––––––––––––––––––––––––––––––––––––––––––––– -->
+  <link rel="stylesheet" href="WHOOCKLE.css">
+
+  <!-- JS
+  –––––––––––––––––––––––––––––––––––––––––––––––––– -->
+  <script src="https://d3js.org/d3.v6.min.js"></script>
+  <script src="WHOOCKLE.js"></script>
+
+</head>
+<body onload="setup()">
+  <div id="whoo_everything">
+    <input type="file" name="inputfile" id="inputfile" onchange="new_file_handler()">
+    <div id="all_contents">
+      <div id="SvgZone">
+        <div class="whoo_button" id="show_controls">show controls</div>
+        <svg id="whoo_svg" width=1200 height=360></svg>
+      </div> 
+      <div id="NavOpsZone">
+        <!--
+        <div class="whoo_button" id="prev_NonNeg">< prev non-negative </div>
+        <div class="well_display" id="wd_NonNeg">A21</div>
+        <div class="whoo_button" id="next_NonNeg">next non-negative ></div>
+        <div class="whoo_button" id="prev_Neg">< prev negative </div>
+        <div class="well_display" id="wd_Neg">A21</div>
+        <div class="whoo_button" id="next_Neg">next negative ></div>
+        -->
+        <div class="whoo_button" id="fail_plate">fail plate</div>
+        <div class="whoo_button" id="unoverride">un-override all</div>
+        <div class="whoo_button" id="prev_well">< prev </div>
+        <div id="well_display"></div>
+        <div class="whoo_button" id="next_well">next ></div>
+      </div> 
+      <div id="TableZone">
+        <div id="whoo_table_holder">
+          <table id="whoo_table">
+            <thead id="whoo_table_head">
+              <tr>
+                <th>Well</th><th>RawCall</th><th>Override</th><th>N1 Ct</th><th>RdRp Ct</th><th>RNaseP Ct</th>
+              </tr>
+            </thead>
+            <tbody id="whoo_table_body">
+            </tbody>
+          </table>
+        </div>
+      </div> 
+      <div id="SummaryZone">
+        <div id="summary_display">
+          <h2 id="summary_title">Summary</h2>
+          <div class="line_divider"></div>
+        </div>
+        <div class="whoo_button" id="whoo_export">EXPORT</div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

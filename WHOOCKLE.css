@@ -1,0 +1,373 @@
+/* Main stylesheet */
+
+/*#region*/ /* Overall Zone Layout */
+
+body {
+  background-color: #111;
+  color: #EEE;
+}
+
+#whoo_everything {
+  position: relative;
+  width: 1200px;
+  height: 800px;
+  margin: 0px auto;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+#inputfile {
+  position: absolute;
+  top: 5px;
+  left: 50px;
+}
+
+#all_contents {
+  position: relative;
+  display: none;
+}
+
+#SvgZone {
+  position: absolute;
+  top: 40px;
+  left: 0px;
+  width: 1200px;
+  height: 360px;
+}
+
+#NavOpsZone {
+  position: absolute;
+  top: 400px;
+  left: 100px;
+  width: 800px;
+  height: 50px;
+}
+
+#TableZone {
+  position: absolute;
+  top: 460px;
+  left: 0px;
+  width: 900px;
+  height: 330px;
+}
+
+#SummaryZone {
+  position: absolute;
+  top: 400px;
+  left: 900px;
+  width: 300px;
+  height: 380px;
+}
+
+/*#endregion*/
+
+/*#region*/ /* Interface buttons */
+
+.whoo_button {
+  min-width: 100px;
+  padding-left: 20px;
+  padding-right: 20px;
+  height: 28px;
+  font-size: 18px;
+  float: left;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-color: #333;
+  cursor: default;
+  user-select: none;
+  padding-bottom: 2px;
+  margin: 10px;
+}
+
+.whoo_button:hover {
+  opacity: 0.8;
+}
+
+#show_controls {
+  position: absolute;
+  top: 25px;
+  left: 300px;
+  width: 120px;
+  height: 20px;
+  font-size: 14px;
+}
+
+#prev_well {
+  margin-left: 50px;
+}
+
+#well_display {
+  width: 40px;
+  height: 28px;
+  font-size: 26px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  cursor: default;
+  float: left;
+  margin: 10px;
+}
+
+
+/*
+
+#well_display {
+  position: absolute;
+  width: 75px;
+  height: 28px;
+  font-size: 26px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  cursor: default;
+  left: 550px;
+  top: 55px;
+}
+
+#prev_well {
+  position: absolute;
+  left: 350px;
+  top: 55px;
+}
+
+#next_well {
+  position: absolute;
+  left: 625px;
+  top: 55px;
+}
+
+#fail_plate {
+  position: absolute;
+  left: 60px;
+  top: 10px;
+}
+
+#unoverride {
+  position: absolute;
+  left: 60px;
+  top: 55px;
+}
+
+#prev_NonNeg {
+  position: absolute;
+  left: 350px;
+  top: 10px;
+}
+
+#next_NonNeg {
+  position: absolute;
+  left: 625px;
+  top: 10px;
+}
+
+#prev_Neg {
+  position: absolute;
+  left: 350px;
+  top: 55px;
+}
+
+#next_Neg {
+  position: absolute;
+  left: 625px;
+  top: 55px;
+}
+
+.well_display {
+  position: absolute;
+  width: 75px;
+  height: 28px;
+  font-size: 26px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  cursor: default;
+}
+
+#wd_NonNeg {
+  left: 550px;
+  top: 10px;
+}
+
+#wd_Neg {
+  left: 550px;
+  top: 55px;
+}
+
+#prev_Neg {
+  position: absolute;
+  left: 350px;
+  top: 55px;
+}
+
+#next_Neg {
+  position: absolute;
+  left: 625px;
+  top: 55px;
+}
+*/
+
+/*#endregion*/
+
+/*#region*/ /* Summary */
+
+#summary_display {
+  position:relative;
+  margin: 0px auto;
+  top: 0px;
+  height: 340px;
+  width: 220px;
+  padding: 10px;
+
+}
+
+#summary_title {
+  font-size: 25px;
+  margin: 5px;
+}
+
+.line_divider {
+  margin:auto;
+  height:4px;
+  width:100%;
+  background-color:#333;
+  border-radius: 2px;
+}
+
+#whoo_export {
+  position: absolute;
+  top: 350px;
+  left: 40px;
+}
+
+.result_button {
+  margin: 6px;
+  justify-content: left;
+  padding-left: 15px;
+  width: 170px;
+}
+
+/*#endregion*/
+
+/*#region*/ /* Table */
+
+#whoo_table_holder {
+  position: absolute;
+  width: 800px;
+  height: 310px;
+  top: 20px;
+  left: 50px;
+  overflow-y: scroll;
+}
+
+#whoo_table {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  top: 0px;
+  left: 0px;
+  border-collapse: collapse;
+  text-align: left;
+  cursor: default;
+}
+
+#whoo_table_head th {
+  position: sticky;
+  top: 0px;
+  background-color: #333;
+}
+
+#whoo_table_body tr {
+  border-bottom: 1px solid #CCC;
+}
+
+#whoo_table_body td {
+  padding-left: 5px;
+}
+
+#well_row_entry {
+  width: 100px;
+  padding: 0px;
+}
+
+.whoo_table_row {
+  transition: border-left 0.2s;
+}
+
+.whoo_table_row.clicked_data {
+  border-left: 15px solid blue;
+}
+
+.whoo_table_row:hover {
+  border-left: 5px solid blue;
+}
+
+.whoo_table_row.filtered_out_data {
+  display: none;
+}
+
+
+
+/*#endregion*/
+
+/*#region*/ /* SVG */
+
+.fluor_path {
+  fill: none;
+}
+
+.ct_cutoff {
+  fill: none;
+  stroke-width: 1px;
+  stroke-dasharray: 10;
+}
+
+.whoo_control_on .fluor_path {
+  stroke-width: 1px;
+  opacity: 0.5;
+}
+
+.whoo_ntc {
+  stroke-dasharray: 4;
+}
+
+.svg_data {
+  stroke-width: 0px;
+}
+
+.svg_data:hover {
+  stroke-width: 1px;
+}
+
+.hovered_data .fluor_path {
+  stroke-width: 1px;
+  opacity: 1;
+}
+
+.hovered_data .well_icon {
+  stroke-width: 1px;
+}
+
+.clicked_data .fluor_path {
+  stroke-width: 3px;
+  opacity: 1;
+}
+
+.clicked_data .well_icon {
+  stroke-width: 3px;
+}
+
+
+.plate_axis path {
+  display: none;
+}
+
+.plate_axis line {
+  display: none;
+}
+
+.axis_label {
+  fill: #EEE;
+  font-size: 18px;
+}
+
+/*#endregion*/
