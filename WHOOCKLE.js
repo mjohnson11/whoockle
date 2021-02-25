@@ -59,18 +59,18 @@ class whooData {
      * Columns: Well, Well Position, N1 CT, RDRP CT, RNASEP CT, RawCall, OverrideCall, Override, FinalCall
      */
     this.export_data = [];
-    let notCleared = ['Inconclusive', 'Rerun-A', 'Rerun-B'];
-    let simple_columns = ['RawCall', 'OverrideCall', 'Override'];
+    let notCleared = ['Rerun-A', 'Rerun-B'];
+    //let simple_columns = ['RawCall', 'OverrideCall', 'Override'];
     for (let d of this.main_data) {
       let tmp_row = {'Position': d['Well Position'], 'InterpretiveResult': whoo_export_map[d['FinalCall']]};
       for (let c of ['N1 CT', 'RDRP CT', 'RNASEP CT']) {
         tmp_row[c.split(' ')[0]] = (d[c]) ? d[c].toFixed(1) : 'Undetermined'; // yeilds Undetermined if CT is NaN, the number formatted to one dec. point if not
       }
-      // Only Positive and Negative calls, excluding control wells, are cleared to report
+      // Only Positive, Negative, and Inconclusive calls, excluding control wells, are cleared to report
       tmp_row['ClearToReport'] = ( (notCleared.indexOf(d['FinalCall']) == -1) && (control_names.indexOf(d['Sample Name']) == -1) );
-      for (let c of simple_columns) { // adding a few extra columns, may remove this eventually
-        tmp_row[c] = d[c];
-      }
+      //for (let c of simple_columns) { // adding a few extra columns, currently removed so parser can work easier
+      //  tmp_row[c] = d[c];
+      //}
       this.export_data.push(tmp_row);
     }
   }
@@ -83,7 +83,9 @@ class whooData {
     let output_name = 'Processed_' + this.input_file.name;
     let plate_ID = this.input_file.name.split(' ')[1].split('.')[0];
     let a = document.createElement('a');
-    let output_file = new Blob(['QpcrPlateId: ' + plate_ID + '\n\n' + d3.tsvFormat(this.export_data)], {type: 'text/plain'});
+    let export_header = 'QpcrPlateId: ' + plate_ID + '\n';
+    export_header += 'InstrumentSerialNumber: ' + this.raw_data.header['Instrument Serial Number'] + '\n\n';
+    let output_file = new Blob([export_header + d3.tsvFormat(this.export_data)], {type: 'text/plain'});
     
     a.href= URL.createObjectURL(output_file);
     a.download = output_name;
@@ -111,7 +113,10 @@ class whooData {
       // a legacy replacement for old files where N1 was N GENE
       file_string = file_string.replaceAll('N GENE', 'N1')
       let split_by_blank_lines = file_string.split(/\n\s*\n/); // split file by blank lines
-      self.raw_data = {'header': split_by_blank_lines[0]};
+      self.raw_data = {'header': {}}; // Parsing header info...
+      for (let line of split_by_blank_lines[0].split('\n')) {
+        self.raw_data.header[line.split(' = ')[0].slice(2,)] = line.split(' = ')[1];
+      }
       for (let block of split_by_blank_lines) {
         if (block[0]=='[') {
           let block_name = block.slice(1,block.indexOf(']'));
@@ -275,10 +280,10 @@ class whooData {
       } else {
         d['RawCall'] = 'Rerun-A'; // ELSE call Rerun-A
       }
-      if (this.plate_errors.length>0) {     // If there are any plate-failure errors, set everything to inconclusive (by override)
+      if (this.plate_errors.length>0) {     // If there are any plate-failure errors, set everything to Rerun-A (by override)
         d['Override'] = true;
-        d['OverrideCall'] = 'Inconclusive';
-        d['FinalCall'] = 'Inconclusive';    // FinalCall will be equal to RawCall when Override is false, and OverrideCall when Override is true
+        d['OverrideCall'] = 'Rerun-A';
+        d['FinalCall'] = 'Rerun-A';    // FinalCall will be equal to RawCall when Override is false, and OverrideCall when Override is true
       } else {                              // ELSE:
         d['Override'] = false;
         d['OverrideCall'] = d['RawCall'];   // Override call defaults to the RawCall, can be changed by the user if Override is true
