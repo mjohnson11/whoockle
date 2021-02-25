@@ -11,10 +11,20 @@ var whoo_colors = {
 };
 
 var whoo_gene_colors = {
-  'N GENE': '#618BE0', // reporter is FAM which is blue/green
+  'N1': '#618BE0', // reporter is FAM which is blue/green
   'RDRP': '#00E66C',   // reporter is VIC which is green
   'RNASEP': '#FF2416'  // reporter is CY5 which is red
 };
+
+var whoo_export_map = {
+  'Inconclusive': 'INCONCLUSIVE RESULT for SARS-CoV-2',
+  'Negative': 'NEGATIVE for SARS-CoV-2',
+  'Positive': 'POSITIVE for SARS-CoV-2',
+  'Rerun-A': 'Retest A',
+  'Rerun-B': 'Retest B'
+}
+
+var control_names = ['PTC', 'NTC', 'NTC-W', 'NTC-P']; // possible sample names for controls
 
 var whoo_table_row_height = 20;
 
@@ -46,17 +56,20 @@ class whooData {
   format_for_export() {
     /**
      * Formats a new dataframe for export
-     * Columns: Well, Well Position, N GENE CT, RDRP CT, RNASEP CT, RawCall, OverrideCall, Override, FinalCall
+     * Columns: Well, Well Position, N1 CT, RDRP CT, RNASEP CT, RawCall, OverrideCall, Override, FinalCall
      */
     this.export_data = [];
-    let simple_columns = ['Well', 'Well Position', 'FinalCall', 'RawCall', 'OverrideCall', 'Override'];
+    let notCleared = ['Inconclusive', 'Rerun-A', 'Rerun-B'];
+    let simple_columns = ['RawCall', 'OverrideCall', 'Override'];
     for (let d of this.main_data) {
-      let tmp_row = {};
-      for (let c of simple_columns) {
-        tmp_row[c] = d[c];
+      let tmp_row = {'Position': d['Well Position'], 'InterpretiveResult': whoo_export_map[d['FinalCall']]};
+      for (let c of ['N1 CT', 'RDRP CT', 'RNASEP CT']) {
+        tmp_row[c.split(' ')[0]] = (d[c]) ? d[c].toFixed(1) : 'Undetermined'; // yeilds Undetermined if CT is NaN, the number formatted to one dec. point if not
       }
-      for (let c of ['N GENE CT', 'RDRP CT', 'RNASEP CT']) {
-        tmp_row[c] = (d[c]) ? d[c].toFixed(1) : 'Undetermined'; // yeilds Undetermined if CT is NaN, the number formatted to one dec. point if not
+      // Only Positive and Negative calls, excluding control wells, are cleared to report
+      tmp_row['ClearToReport'] = ( (notCleared.indexOf(d['FinalCall']) == -1) && (control_names.indexOf(d['Sample Name']) == -1) );
+      for (let c of simple_columns) { // adding a few extra columns, may remove this eventually
+        tmp_row[c] = d[c];
       }
       this.export_data.push(tmp_row);
     }
@@ -68,8 +81,9 @@ class whooData {
      */
     this.format_for_export();
     let output_name = 'Processed_' + this.input_file.name;
+    let plate_ID = this.input_file.name.split(' ')[1].split('.')[0];
     let a = document.createElement('a');
-    let output_file = new Blob([d3.tsvFormat(this.export_data)], {type: 'text/plain'});
+    let output_file = new Blob(['QpcrPlateId: ' + plate_ID + '\n\n' + d3.tsvFormat(this.export_data)], {type: 'text/plain'});
     
     a.href= URL.createObjectURL(output_file);
     a.download = output_name;
@@ -94,6 +108,8 @@ class whooData {
     let self = this; // to avoid "this" pointing to the wrong thing inside the onload
     fr.onload=function() { // this function runs once the file is loaded - all the action is in here
       let file_string = fr.result;
+      // a legacy replacement for old files where N1 was N GENE
+      file_string = file_string.replaceAll('N GENE', 'N1')
       let split_by_blank_lines = file_string.split(/\n\s*\n/); // split file by blank lines
       self.raw_data = {'header': split_by_blank_lines[0]};
       for (let block of split_by_blank_lines) {
@@ -151,8 +167,9 @@ class whooData {
      * This function takes the raw_data object from load_file() and creates the main_data dataFrame
      * with these columns:
      * Directly from the results data: "Well", "Well Position"
-     * Added from the results data: "N GENE CT", "RDRP CT", "RNASEP CT"
-     * Added from the amplification data: "N GENE FC", "RDRP FC", "RNASEP FC" 
+     * Mapped from the sample setup data: "Sample Name"
+     * Added from the results data: "N1 CT", "RDRP CT", "RNASEP CT"
+     * Added from the amplification data: "N1 FC", "RDRP FC", "RNASEP FC" 
      * (a semicolon separated list of fluorescence data (FC for flourescence curve))
      * To be added later: 
      * "RawCall" - computed based on CT results
@@ -166,6 +183,12 @@ class whooData {
     this.plate_errors = [];
     this.plate_warnings = [];
     this.CT_cutoffs = {};
+    this.sample_name_map = {};
+    for (let row of this.raw_data['Sample Setup']) {
+      // Getting a map between "Well" (a # identifying a well) and sample names
+      // This is a bit redundant because there are three rows per well/sample, but that's ok
+      this.sample_name_map[row['Well']] = row['Sample Name']; 
+    }
     for (let group of d3.groups(this.raw_data['Results'], d => d.Well)) { // groups data by well number
       let rows = group[1];
       let tmp_obj = {'Well': group[0], 'Well Position': rows[0]['Well Position']};
@@ -173,6 +196,7 @@ class whooData {
         tmp_obj[row['Target Name'] + ' CT'] = parseFloat(row['CT']); // adding CT values for the appropriate target
         // Adding fluorescence data
         tmp_obj[row['Target Name'] + ' FC'] = this.extract_fluorescence_data(this.raw_data['Amplification Data'], group[0], row['Target Name']); 
+        tmp_obj['Sample Name'] = this.sample_name_map[row['Well']];
         // Recording the CT cutoffs  - This is very redundant/inefficient, there are only three key: value pairs
         // but we just keep resetting them as we go through the data.
         // Have to do the replace because THESE MANIACS export data with commas for thousands etc.
@@ -194,46 +218,40 @@ class whooData {
     /**
      * Checks the control data for the plate
      * - Checks if the control samples are in the expected wells 
-     * - Checks if EITHER of both the PCTs failed (were negative, CT>30) for either N GENE or RDRP
-     * - Checks if BOTH of the NTCs failed (were positive, CT<38) for either N GENE or RDRP
+     * - Checks if EITHER of both the PCTs failed (were negative, CT>30) for either N1 or RDRP
+     * - Checks if BOTH of the NTCs failed (were positive, CT<38) for either N1 or RDRP
      * All of these checks are recorded in an array (this.plate_failures)
      */
-    this.control_wells = {};
     if (whoo_DEBUG) console.log('in check_plate_data()');
     this.plate_failures = [];
-    let ptc_samp_data = sample_data.filter(row => (row['Sample Name'] == 'PTC'));
-    this.ptc_wells = Array.from(new Set(d3.map(ptc_samp_data, row => row.Well)));
-    if (!((this.ptc_wells.indexOf('360')>-1) && (this.ptc_wells.indexOf('384')>-1) && (this.ptc_wells.length==2))) {
-      this.plate_warnings.push('WARNING: Unexpected plate layout, PTCs are at Wells: ' + this.ptc_wells.join(', '));
-    }
-    for (let row of ptc_samp_data) {
-      this.control_wells[row.Well] = row['Sample Name'];
-    }
     let ntc_sample_names = ['NTC-W', 'NTC-P'];
-    let ntc_samp_data = sample_data.filter(row => (ntc_sample_names.indexOf(row['Sample Name'])>-1));
-    this.ntc_wells = Array.from(new Set(d3.map(ntc_samp_data, row => row.Well)));
-    if (!((this.ntc_wells.indexOf('337')>-1) && (this.ntc_wells.indexOf('361')>-1) && (this.ntc_wells.length==2))) {
-      this.plate_warnings.push('WARNING: Unexpected plate layout, NTCs are at Wells: ' + this.ntc_wells.join(', '));
+    this.ntc_data = this.main_data.filter(row => (ntc_sample_names.indexOf(row['Sample Name']) > -1));
+    this.ptc_data = this.main_data.filter(row => (row['Sample Name'] == 'PTC'));
+    this.ntc_well_positions = d3.map(this.ntc_data, row => row['Well Position']);
+    this.ptc_well_positions = d3.map(this.ptc_data, row => row['Well Position']);
+    
+    // Checking they are in the expected spots, will raise warnings if not
+    if (!((this.ptc_well_positions.indexOf('O23')>-1) && (this.ptc_well_positions.indexOf('P24')>-1) && (this.ptc_well_positions.length==2))) {
+      this.plate_warnings.push('WARNING: Unexpected plate layout, PTCs are at Wells: ' + this.ptc_well_positions.join(', '));
     }
-    for (let row of ntc_samp_data) {
-      this.control_wells[row.Well] = row['Sample Name'];
+    if (!((this.ntc_well_positions.indexOf('O24')>-1) && (this.ntc_well_positions.indexOf('P23')>-1) && (this.ntc_well_positions.length==2))) {
+      this.plate_warnings.push('WARNING: Unexpected plate layout, NTCs are at Wells: ' + this.ntc_well_positions.join(', '));
     }
     
-    if (!((this.ptc_wells.length==2) && (this.ntc_wells.length==2))) {
-      this.plate_errors.push('Could not find 2 PTCs and/or 2 NTCs'); // Did not find control wells...
+    // Checking for plate errors
+    if (!((this.ptc_well_positions.length==2) && (this.ntc_well_positions.length==2))) {
+      this.plate_errors.push('PLATE ERROR: Could not find 2 PTCs and/or 2 NTCs'); // Did not find control wells...
     } else {
-      this.ptc_data = this.main_data.filter(row => (this.ptc_wells.indexOf(row['Well'])>-1));
-      this.ntc_data = this.main_data.filter(row => (this.ntc_wells.indexOf(row['Well'])>-1));
       // Note: "Undetermined" CTs are NaN here. NaN compared to a number will always return false
       // Therefore all comparisons with CTs will ask if a CT is less than some threshold
-      // CHECK 1: PTCs are NOT both NEG for N GENE
-      if ( (!(this.ptc_data[0]['N GENE CT']<30)) && (!(this.ptc_data[1]['N GENE CT']<30)) ) this.plate_errors.push('ERROR: Both PTCs N GENE CT>30');
+      // CHECK 1: PTCs are NOT both NEG for N1
+      if ( (!(this.ptc_data[0]['N1 CT']<30)) && (!(this.ptc_data[1]['N1 CT']<30)) ) this.plate_errors.push('PLATE ERROR: Both PTCs N1 CT>30');
       // CHECK 2: PTCs are NOT both NEG for RDRP
-      if ( (!(this.ptc_data[0]['RDRP CT']<30)) && (!(this.ptc_data[1]['RDRP CT']<30)) ) this.plate_errors.push('PCT_FAIL_RDRP');
-      // CHECK 3: NTCs are NOT both POS for N GENE
-      if ((this.ntc_data[0]['N GENE CT']<38) || (this.ntc_data[1]['N GENE CT']<38)) this.plate_errors.push('NCT_FAIL_N GENE'); 
-      // CHECK 3: NTCs are NOT both POS for RDRP
-      if ((this.ntc_data[0]['RDRP CT']<38) || (this.ntc_data[1]['RDRP CT']<38)) this.plate_errors.push('NCT_FAIL_RDRP'); 
+      if ( (!(this.ptc_data[0]['RDRP CT']<30)) && (!(this.ptc_data[1]['RDRP CT']<30)) ) this.plate_errors.push('PLATE ERROR: Both PTCs RDRP CT>30');
+      // CHECK 3: NTCs are both NOT POS for N1
+      if ((this.ntc_data[0]['N1 CT']<38) || (this.ntc_data[1]['N1 CT']<38)) this.plate_errors.push('PLATE ERROR: At least one NTC N1 CT<38'); 
+      // CHECK 3: NTCs are both NOT POS for RDRP
+      if ((this.ntc_data[0]['RDRP CT']<38) || (this.ntc_data[1]['RDRP CT']<38)) this.plate_errors.push('PLATE ERROR: At least one NTC RDRP CT<38'); 
     }
   }
 
@@ -246,14 +264,14 @@ class whooData {
     for (let d of this.main_data) {
       // Note: "Undetermined" CTs are NaN here. NaN compared to a number will always return false
       // Therefore all comparisons with CTs will ask if a CT is less than some threshold
-      if ( (d['N GENE CT']<30) || (d['RDRP CT']<30) ) { 
-        d['RawCall'] = 'Positive'; // If N GENE CT < 30 OR RDRP CT < 30, call Positive
-      } else if ( (d['N GENE CT']<38) && (d['RDRP CT']<38) ) {
-        d['RawCall'] = 'Positive'; // If N GENE CT < 38 AND RDRP CT < 38, call Positive
-      } else if ( ( (!(d['N GENE CT']<38)) && (!(d['RDRP CT']<38)) ) && (d['RNASEP CT']<34) ) {
-        d['RawCall'] = 'Negative'; // If N GENE CT > 38 AND RDRP CT > 38 AND RNASEP CT < 34, call Negative
-      } else if ( (d['N GENE CT']<38) || (d['RDRP CT']<38) ) {
-        d['RawCall'] = 'Rerun-B'; // If N GENE CT < 38 OR RDRP CT < 38, call Rerun-B
+      if ( (d['N1 CT']<30) || (d['RDRP CT']<30) ) { 
+        d['RawCall'] = 'Positive'; // If N1 CT < 30 OR RDRP CT < 30, call Positive
+      } else if ( (d['N1 CT']<38) && (d['RDRP CT']<38) ) {
+        d['RawCall'] = 'Positive'; // If N1 CT < 38 AND RDRP CT < 38, call Positive
+      } else if ( ( (!(d['N1 CT']<38)) && (!(d['RDRP CT']<38)) ) && (d['RNASEP CT']<34) ) {
+        d['RawCall'] = 'Negative'; // If N1 CT > 38 AND RDRP CT > 38 AND RNASEP CT < 34, call Negative
+      } else if ( (d['N1 CT']<38) || (d['RDRP CT']<38) ) {
+        d['RawCall'] = 'Rerun-B'; // If N1 CT < 38 OR RDRP CT < 38, call Rerun-B
       } else {
         d['RawCall'] = 'Rerun-A'; // ELSE call Rerun-A
       }
@@ -282,9 +300,9 @@ class whooData {
      * there will be other class styling, but these are the immutable parts
      */
     let class_str = 'raw_call_'+d['RawCall'];
-    if ((this.ntc_wells.indexOf(d.Well) > -1) || (this.ptc_wells.indexOf(d.Well) > -1)) class_str += ' whoo_control';
-    if (this.ntc_wells.indexOf(d.Well) > -1) class_str += ' whoo_ntc';
-    if (this.ptc_wells.indexOf(d.Well) > -1) class_str += ' whoo_ptc';
+    if ((this.ntc_well_positions.indexOf(d['Well Position']) > -1) || (this.ptc_well_positions.indexOf(d['Well Position']) > -1)) class_str += ' whoo_control';
+    if (this.ntc_well_positions.indexOf(d['Well Position']) > -1) class_str += ' whoo_ntc';
+    if (this.ptc_well_positions.indexOf(d['Well Position']) > -1) class_str += ' whoo_ptc';
     return class_str;
   }
 
@@ -303,18 +321,13 @@ class whooData {
         .on('mouseout', function(event, d) { d3.selectAll('.svg_data').classed('hovered_data', false); }) // nothing hovered
         .on('click', function(event, d) { self.highlight_well(d.Well); });
 
-    d3.selectAll('.whoo_table_row').append('td').attr('class', 'Well_row_entry').html(function(d) {
-      let well = d['Well Position'];
-      if (d['whoo_class_base'].indexOf('whoo_control') > -1) {
-        well += ' (' + self.control_wells[d.Well] + ')'
-      }
-      return well;
-    });
+    d3.selectAll('.whoo_table_row').append('td').attr('class', 'Well_row_entry').html(d => d['Well Position']);
+    d3.selectAll('.whoo_table_row').append('td').attr('class', 'SampleName_row_entry').html(d => d['Sample Name']);
     d3.selectAll('.whoo_table_row').append('td').attr('class', 'RawCall_row_entry').html(d => d.RawCall);
     let override_entry = d3.selectAll('.whoo_table_row').append('td').attr('class', 'Override_row_entry');
-    d3.selectAll('.whoo_table_row').append('td').attr('class', 'CT_row_entry').html(d => d['N GENE CT'] || '-'); // Or (||) override makes NaN show up as -
-    d3.selectAll('.whoo_table_row').append('td').attr('class', 'CT_row_entry').html(d => d['RDRP CT'] || '-');
-    d3.selectAll('.whoo_table_row').append('td').attr('class', 'CT_row_entry').html(d => d['RNASEP CT'] || '-');
+    d3.selectAll('.whoo_table_row').append('td').attr('class', 'CT_row_entry').html(d => (d['N1 CT']) ? d['N1 CT'].toFixed(1) : 'Und.'); // Or (||) override makes NaN show up as -
+    d3.selectAll('.whoo_table_row').append('td').attr('class', 'CT_row_entry').html(d => (d['RDRP CT']) ? d['RDRP CT'].toFixed(1) : 'Und.');
+    d3.selectAll('.whoo_table_row').append('td').attr('class', 'CT_row_entry').html(d => (d['RNASEP CT']) ? d['RNASEP CT'].toFixed(1) : 'Und.');
     override_entry.append('input')
       .attr('type', 'checkbox')
       .attr('class', 'override_checkbox')
@@ -366,11 +379,11 @@ class whooData {
       self.filtered_call = call;
       if (self.filtered_call) {
         if (self.filtered_call == 'controls') {
-          d3.selectAll('.whoo_table_row').classed('filtered_out_data', d => (!(d.Well in self.control_wells)));
-          self.filtered_data = self.main_data.filter(d => (d.Well in self.control_wells));
+          d3.selectAll('.whoo_table_row').classed('filtered_out_data', d => control_names.indexOf(d['Sample Name']) == -1);
+          self.filtered_data = self.main_data.filter(d => control_names.indexOf(d['Sample Name']) > -1);
         } else {
-          d3.selectAll('.whoo_table_row').classed('filtered_out_data', d => ((d.FinalCall!=self.filtered_call) || (d.Well in self.control_wells)));
-          self.filtered_data = self.main_data.filter(d => ((d.FinalCall==self.filtered_call) && (!(d.Well in self.control_wells))));
+          d3.selectAll('.whoo_table_row').classed('filtered_out_data', d => ((d.FinalCall!=self.filtered_call) || (control_names.indexOf(d['Sample Name']) > -1)));
+          self.filtered_data = self.main_data.filter(d => ((d.FinalCall==self.filtered_call) && (control_names.indexOf(d['Sample Name']) == -1)));
         }
       } else {
         d3.selectAll('.whoo_table_row').classed('filtered_out_data', false);
@@ -392,7 +405,7 @@ class whooData {
       .append('div')
         .attr('class', 'whoo_button result_button summary_result')
         .style('background-color', d => whoo_colors[d])
-        .html(function(d) { return String(self.main_data.filter(td => ((td.FinalCall==d) && (!(td.Well in self.control_wells)))).length) + ' ' + d; })
+        .html(function(d) { return String(self.main_data.filter(td => ((td.FinalCall==d) && (control_names.indexOf(td['Sample Name']) == -1))).length) + ' ' + d; })
         .on('click', function(event, d) { self.filter_by_call(d); });
     
     d3.select('#summary_display')
@@ -593,7 +606,7 @@ class whooData {
      */
     let self = this;
     d3.select('#summary_display').selectAll('.summary_result')
-      .html(function(d) { return String(self.main_data.filter(td => ((td.FinalCall==d) && (!(td.Well in self.control_wells)))).length) + ' ' + d; });
+      .html(function(d) { return String(self.main_data.filter(td => ((td.FinalCall==d) && (control_names.indexOf(td['Sample Name']) == -1))).length) + ' ' + d; });
 
     this.svg.selectAll('.well_icon')
         .attr('fill', d => whoo_colors[d.FinalCall].replace('33%', '45%') );
