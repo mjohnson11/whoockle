@@ -80,7 +80,7 @@ class whooData {
      * Exports final calls and CTs of each well
      */
     this.format_for_export();
-    let output_name = 'Processed_' + this.input_file.name;
+    let output_name = 'Processed_' + this.input_file.name.replace('.txt', '.csv');
     let plate_ID = this.input_file.name.split(' ')[1].split('.')[0];
     let a = document.createElement('a');
     let export_header = 'QpcrPlateId: ' + plate_ID + '\n';
