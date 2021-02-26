@@ -85,7 +85,7 @@ class whooData {
     let a = document.createElement('a');
     let export_header = 'QpcrPlateId: ' + plate_ID + '\n';
     export_header += 'InstrumentSerialNumber: ' + this.raw_data.header['Instrument Serial Number'] + '\n\n';
-    let output_file = new Blob([export_header + d3.tsvFormat(this.export_data)], {type: 'text/plain'});
+    let output_file = new Blob([export_header + d3.csvFormat(this.export_data)], {type: 'text/plain'});
     
     a.href= URL.createObjectURL(output_file);
     a.download = output_name;
