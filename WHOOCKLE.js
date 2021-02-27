@@ -64,7 +64,7 @@ class whooData {
     for (let d of this.main_data) {
       let tmp_row = {'Position': d['Well Position'], 'InterpretiveResult': whoo_export_map[d['FinalCall']]};
       for (let c of ['N1 CT', 'RDRP CT', 'RNASEP CT']) {
-        tmp_row[c.split(' ')[0]] = (d[c]) ? d[c].toFixed(1) : 'Undetermined'; // yeilds Undetermined if CT is NaN, the number formatted to one dec. point if not
+        tmp_row[c.split(' ')[0]] = (d[c]) ? d[c].toFixed(1) : '45'; // yeilds empty string if CT is NaN, the number formatted to one dec. point if not
       }
       // Only Positive, Negative, and Inconclusive calls, excluding control wells, are cleared to report
       tmp_row['ClearToReport'] = ( (notCleared.indexOf(d['FinalCall']) == -1) && (control_names.indexOf(d['Sample Name']) == -1) );
@@ -227,6 +227,7 @@ class whooData {
      * - Checks if BOTH of the NTCs failed (were positive, CT<38) for either N1 or RDRP
      * All of these checks are recorded in an array (this.plate_failures)
      */
+    let self = this;
     if (whoo_DEBUG) console.log('in check_plate_data()');
     this.plate_failures = [];
     let ntc_sample_names = ['NTC-W', 'NTC-P'];
@@ -258,6 +259,11 @@ class whooData {
       // CHECK 3: NTCs are both NOT POS for RDRP
       if ((this.ntc_data[0]['RDRP CT']<38) || (this.ntc_data[1]['RDRP CT']<38)) this.plate_errors.push('PLATE ERROR: At least one NTC RDRP CT<38'); 
     }
+
+    d3.select("#plate_error_text").html(self.plate_errors.join('<br />') + '<br />' + self.plate_warnings.join('<br />'));
+    d3.select("#plate_fail_x_out").on('click', function() { d3.select("#plate_fail_popup").style('display', 'none'); } );
+    if ((this.plate_errors.length>0) || (this.plate_warnings.length>0)) d3.select("#plate_fail_popup").style('display', 'block');
+
   }
 
   call_wells() {
@@ -324,7 +330,7 @@ class whooData {
         .style('background-color', d => whoo_colors[d.FinalCall])
         .on('mouseover', function(event, d) { d3.selectAll('.svg_data').classed('hovered_data', td => td.Well==d.Well); }) //hover on table -> hover display on svg
         .on('mouseout', function(event, d) { d3.selectAll('.svg_data').classed('hovered_data', false); }) // nothing hovered
-        .on('click', function(event, d) { self.highlight_well(d.Well); });
+        .on('click', function(event, d) { self.highlight_well(d.Well, event.shiftKey); });
 
     d3.selectAll('.whoo_table_row').append('td').attr('class', 'Well_row_entry').html(d => d['Well Position']);
     d3.selectAll('.whoo_table_row').append('td').attr('class', 'SampleName_row_entry').html(d => d['Sample Name']);
@@ -353,10 +359,19 @@ class whooData {
     override_select.property('value', d => d.OverrideCall);
 
     d3.select('#unoverride').on('click', function() { self.set_override_all(false); }); // sets up listener for unoverride button press
-    d3.select('#fail_plate').on('click', function() { self.set_override_all(true); }); // sets up listener for fail plate button press
+    d3.select('#rerun_all').on('click', function() { self.set_override_all('Rerun-A'); }); // sets up listener for rerun all button press
+    d3.select('#all_inconclusive').on('click', function() { self.set_override_all('Inconclusive'); }); // sets up listener for all inconclusive button press
 
-    d3.select('#prev_well').on('click', function() { self.iterate_over_wells(-1); }); // sets up listener for previous button press
-    d3.select('#next_well').on('click', function() { self.iterate_over_wells(1); });  // sets up listener for next button press
+    d3.select('#prev_well').on('click', function(e) { self.iterate_over_wells(-1, e.shiftKey); }); // sets up listener for previous button press
+    d3.select('#next_well').on('click', function(e) { self.iterate_over_wells(1, e.shiftKey); });  // sets up listener for next button press
+
+    d3.select('body').on('keydown', function(e) {
+      if (['ArrowDown', 'ArrowRight'].indexOf(e.key)>-1) {
+        self.iterate_over_wells(1, e.shiftKey);
+      } else if (['ArrowUp', 'ArrowLeft'].indexOf(e.key)>-1) {
+        self.iterate_over_wells(-1, e.shiftKey);
+      }
+    })
   }
 
   update_filtered_wells() {
@@ -426,7 +441,7 @@ class whooData {
         .on('click', function() { self.filter_by_call('show_all'); });
   }
 
-  iterate_over_wells(step) {
+  iterate_over_wells(step, shift_key_pressed) {
     /**
      * highlights the previous (step=-1) or next (step=1) well in the set of filtered wells
      */
@@ -442,7 +457,7 @@ class whooData {
           current_well += step
         }
       }
-      this.highlight_well(String(current_well));
+      this.highlight_well(String(current_well), shift_key_pressed);
     }
   }
 
@@ -459,7 +474,7 @@ class whooData {
     }
   }
 
-  highlight_well(well) {
+  highlight_well(well, shift_key_pressed) {
     /**
      * On click on the svg or the table, highlights on the svg and the table
      */
@@ -467,10 +482,14 @@ class whooData {
     if (whoo_DEBUG) console.log('in highlight_well()', well);
     let self = this;
     self.highlighted_well = (self.highlighted_well==well) ? null : well; 
-    d3.selectAll('.svg_data').classed('clicked_data', d => d.Well==self.highlighted_well);
+    d3.selectAll('.svg_data').classed('clicked_data', function(d) {
+      if ((d3.select(this).classed('clicked_data')) && (shift_key_pressed)) return true; // if shift key is pressed, keep displaying the others too
+      return d.Well==self.highlighted_well;
+    });
     let row_element;
     let well_position = '';
     d3.selectAll('.whoo_table_row').classed('clicked_data', function(d) {
+      if ((d3.select(this).classed('clicked_data')) && (shift_key_pressed)) return true; // if shift key is pressed, keep displaying the others too
       if (d.Well==self.highlighted_well) {
         row_element = this; // using this classed call to also find the row element
         well_position = d['Well Position']; // And grab the well position
@@ -478,7 +497,7 @@ class whooData {
       return (d.Well==self.highlighted_well);
     });
     d3.select('#well_display').html(well_position);
-    this.scroll_to_row(row_element);
+    if (row_element) this.scroll_to_row(row_element);
   }
 
   make_svg() {
@@ -537,7 +556,7 @@ class whooData {
       .enter()
       .append('g')
         .attr('class', function(d) { return 'svg_data ' + d['whoo_class_base']; })
-        .on('click', function(event, d) { self.highlight_well(d.Well); });
+        .on('click', function(event, d) { self.highlight_well(d.Well, event.shiftKey); });
 
     for (let gene of Object.keys(whoo_gene_colors)) {
       this.svg.selectAll('.svg_data')
@@ -617,7 +636,7 @@ class whooData {
         .attr('fill', d => whoo_colors[d.FinalCall].replace('33%', '45%') );
   }
 
-  set_override_all(override_bool) {
+  set_override_all(override_key) {
     /**
      * Sets the whole plate override settings
      * false:
@@ -630,14 +649,14 @@ class whooData {
     if (whoo_DEBUG) console.log('in set_override_all()');
     d3.selectAll('.override_checkbox')
       .each( function(d) {
-        d.Override = override_bool;        // set overrides true or false
-        d.OverrideCall = (override_bool) ? 'Inconclusive' : d.RawCall; // initialize override calls to Inconclusive or RawCall (true or false respectively)
-        d.FinalCall = (override_bool) ? d.OverrideCall : d.RawCall;   // set FinalCall to OverrideCall or RawCall (true or false respectively)
+        d.Override = Boolean(override_key);        // set overrides true or false
+        d.OverrideCall = override_key || d.RawCall; // initialize override calls to override_key or RawCall (true or false respectively)
+        d.FinalCall = (d.Override) ? d.OverrideCall : d.RawCall;   // set FinalCall to OverrideCall or RawCall (true or false respectively)
         d3.select(this.parentNode).selectAll('.override_select')
-          .style('display', (override_bool) ? 'inline' : 'none') // show or hide select
+          .style('display', (override_key) ? 'inline' : 'none') // show or hide select
           .property('value', d.OverrideCall); // set default value to OverrideCall value
         d3.select(this.parentNode.parentNode).style('background-color', td => whoo_colors[td.FinalCall]); // set color to new FinalCall
-        d3.select(this).property('checked', override_bool); // display override check correctly
+        d3.select(this).property('checked', Boolean(override_key)); // display override check correctly
       });
     this.update_calls_display();
   }

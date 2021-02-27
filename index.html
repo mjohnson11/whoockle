@@ -32,8 +32,9 @@
         <div class="well_display" id="wd_Neg">A21</div>
         <div class="whoo_button" id="next_Neg">next negative ></div>
         -->
-        <div class="whoo_button" id="fail_plate">fail plate</div>
-        <div class="whoo_button" id="unoverride">un-override all</div>
+        <div class="whoo_button" id="rerun_all">All Rerun-A</div>
+        <div class="whoo_button" id="all_inconclusive">All Inconclusive</div>
+        <div class="whoo_button" id="unoverride">Un-override All</div>
         <div class="whoo_button" id="prev_well">< prev </div>
         <div id="well_display"></div>
         <div class="whoo_button" id="next_well">next ></div>
@@ -41,6 +42,8 @@
       <div id="TableZone">
         <div id="whoo_table_holder">
           <table id="whoo_table">
+            <col id="column_Well"><col id="column_Sample"><col id="column_RawCall"><col id="column_Override">
+            <col id="column_N1 Ct"><col id="column_RdRp Ct"><col id="column_RNaseP Ct">
             <thead id="whoo_table_head">
               <tr>
                 <th>Well</th><th>Sample</th><th>RawCall</th><th>Override</th><th>N1 Ct</th><th>RdRp Ct</th><th>RNaseP Ct</th>
@@ -58,6 +61,11 @@
         </div>
         <div class="whoo_button" id="whoo_export">EXPORT</div>
       </div>
+    </div>
+    <div id="plate_fail_popup">
+      <div id="plate_fail_x_out">X</div>
+      <h1>Issues with this plate detected</h1>
+      <p id="plate_error_text"></p>
     </div>
   </div>
 </body>
