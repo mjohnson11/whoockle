@@ -26,6 +26,18 @@ body {
   display: none;
 }
 
+#plate_title {
+  position: absolute;
+  top: 5px;
+  left: 300px;
+  width: 600px;
+  height: 35px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 24px;
+}
+
 #SvgZone {
   position: absolute;
   top: 40px;

@@ -1,0 +1,15 @@
+QpcrPlateId: 2010008163
+
+Position,InterpretiveResult,N1,RDRP,RNASEP,ClearToReport
+B1,NEGATIVE for SARS-CoV-2,1,2,3,True
+B2,NEGATIVE for SARS-CoV-2,1,2,3,True
+B3,NEGATIVE for SARS-CoV-2,1,2,3,True
+B4,POSITIVE for SARS-CoV-2,1,2,3,True
+B5,POSITIVE for SARS-CoV-2,1,2,3,True
+B6,POSITIVE for SARS-CoV-2,1,2,3,True
+B7,POSITIVE for SARS-CoV-2,1,2,3,True
+B8,POSITIVE for SARS-CoV-2,1,2,3,True
+B9,Retest A,0,0,0,False
+B10,Retest A,0,0,0,False
+B11,Retest B,0,0,0,False
+B12,Retest B,0,0,0,False

@@ -109,6 +109,8 @@ class whooData {
     let fr = new FileReader(); 
     let self = this; // to avoid "this" pointing to the wrong thing inside the onload
     fr.onload=function() { // this function runs once the file is loaded - all the action is in here
+      d3.select('#inputfile').style('display', 'none'); // hide file input once a file is loaded
+      d3.select('#plate_title').html('Plate file: ' + self.input_file.name); // display file name
       let file_string = fr.result;
       // a legacy replacement for old files where N1 was N GENE
       file_string = file_string.replaceAll('N GENE', 'N1')

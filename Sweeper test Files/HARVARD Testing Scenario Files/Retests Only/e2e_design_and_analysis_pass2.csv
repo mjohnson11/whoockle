@@ -1,0 +1,6 @@
+QpcrPlateId: 2010008999
+
+Position,InterpretiveResult,N1,RDRP,RNASEP,ClearToReport
+C10,INVALID - Assay failed twice,1,2,3,True
+C11,INCONCLUSIVE RESULT for SARS-CoV-2,1,2,3,True
+C12,POSITIVE for SARS-CoV-2,1,2,3,True
