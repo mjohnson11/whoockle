@@ -16,6 +16,7 @@ var whoo_gene_colors = {
   'RNASEP': '#FF2416'  // reporter is CY5 which is red
 };
 
+// Export formatting object
 var whoo_export_map = {
   'Inconclusive': 'INCONCLUSIVE RESULT for SARS-CoV-2',
   'Negative': 'NEGATIVE for SARS-CoV-2',
@@ -24,7 +25,22 @@ var whoo_export_map = {
   'Rerun-B': 'Retest B'
 }
 
-var control_names = ['PTC', 'NTC', 'NTC-W', 'NTC-P']; // possible sample names for controls
+// THE EXPORT MAPPING FOR CONTROLS IS WEIRD
+// Basically Positive means it worked, Negative means it failed
+// For NTC, we only export positive if we get Rerun-A, which is what we expect, and otherwise report negative
+// For PTC, we only export positive if we get positive, which is what we expect, and otherwise report negative
+var whoo_export_map_controls = {
+  'NTC': {'Negative': 'NEGATIVE for SARS-CoV-2',
+          'Positive': 'NEGATIVE for SARS-CoV-2',
+          'Inconclusive': 'NEGATIVE for SARS-CoV-2',
+          'Rerun-B': 'NEGATIVE for SARS-CoV-2',
+          'Rerun-A': 'POSITIVE for SARS-CoV-2'},
+  'PTC': {'Negative': 'NEGATIVE for SARS-CoV-2',
+          'Positive': 'POSITIVE for SARS-CoV-2',
+          'Inconclusive': 'NEGATIVE for SARS-CoV-2',
+          'Rerun-B': 'NEGATIVE for SARS-CoV-2',
+          'Rerun-A': 'NEGATIVE for SARS-CoV-2'},
+}
 
 var whoo_table_row_height = 20;
 
@@ -35,6 +51,7 @@ var whoo_rows = ['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P'
 // Can hard code these locally in the future (should not be shared)
 var whoo_username;
 var whoo_password;
+var whoo_use_server = true;
 
 class whooData {
   /**
@@ -66,12 +83,17 @@ class whooData {
     let notCleared = ['Rerun-A', 'Rerun-B'];
     //let simple_columns = ['RawCall', 'OverrideCall', 'Override'];
     for (let d of this.main_data) {
-      let tmp_row = {'Position': d['Well Position'], 'InterpretiveResult': whoo_export_map[d['FinalCall']]};
+      let tmp_row = {'Position': d['Well Position']};
+      if (d.is_control) {
+        tmp_row['InterpretiveResult'] = whoo_export_map_controls[d['Sample Name'].slice(0,3)][d['FinalCall']];
+      } else {
+        tmp_row['InterpretiveResult'] = whoo_export_map[d['FinalCall']];
+      }
       for (let c of ['N1 CT', 'RDRP CT', 'RNASEP CT']) {
         tmp_row[c.split(' ')[0]] = (d[c]) ? d[c].toFixed(1) : '45'; // yeilds empty string if CT is NaN, the number formatted to one dec. point if not
       }
-      // Only Positive, Negative, and Inconclusive calls, excluding control wells, are cleared to report
-      tmp_row['ClearToReport'] = ( (notCleared.indexOf(d['FinalCall']) == -1) && (control_names.indexOf(d['Sample Name']) == -1) );
+      // Only Positive, Negative, and Inconclusive calls are cleared to report. Control wells are always cleared to report.
+      tmp_row['ClearToReport'] = ((notCleared.indexOf(d['FinalCall']) == -1) || (d.is_control));
       //for (let c of simple_columns) { // adding a few extra columns, currently removed so parser can work easier
       //  tmp_row[c] = d[c];
       //}
@@ -85,13 +107,12 @@ class whooData {
      */
     this.format_for_export();
     let output_name = 'Processed_' + this.input_file.name.replace('.txt', '.csv');
-    let plate_ID = this.raw_data.header['Experiment Name'];
     let a = document.createElement('a');
-    let export_header = 'QpcrPlateId: ' + plate_ID + '\n';
+    let export_header = 'QpcrPlateId: ' + this.plate_id + '\n';
     export_header += 'InstrumentSerialNumber: ' + this.raw_data.header['Instrument Serial Number'] + '\n\n';
     let output_text = export_header + d3.csvFormat(this.export_data);
     // weird replaceAll makes sure we get output in windows format
-    let output_file = new Blob([output_text.replaceAll('\r\n', '\n').replaceAll('\n', '\r\n')], {type: 'text/plain'});
+    let output_file = new Blob([output_text.replaceAll('\n', '\r\n')], {type: 'text/plain'});
     
     a.href= URL.createObjectURL(output_file);
     a.download = output_name;
@@ -103,19 +124,25 @@ class whooData {
   load_json_from_server() {
     //this.process_data();
     let self = this;
-    this.xhr = new XMLHttpRequest();
-    this.xhr.withCredentials = true;
-    this.xhr.addEventListener("readystatechange", function() {
-      if(this.readyState === 4) {
-        console.log(this.responseText);
-        self.retest_data = JSON.parse(this.response);
-        self.process_data();
-      }
-    });
-    this.xhr.open("GET", "http://hucldevint.samplemanager.com:56105/covid-retests-for-plate/B032622");
-    console.log("Basic " + btoa(whoo_username+':'+whoo_password));
-    this.xhr.setRequestHeader("Authorization", "Basic " + btoa(whoo_username+':'+whoo_password));
-    this.xhr.send();
+    if (whoo_use_server) {
+      this.xhr = new XMLHttpRequest();
+      this.xhr.withCredentials = true;
+      this.xhr.addEventListener("readystatechange", function() {
+        if(this.readyState === 4) {
+          console.log(this.responseText);
+          self.retest_data = JSON.parse(this.response);
+          self.make_main_data();
+        }
+      });
+      this.xhr.open("GET", "http://hucldevint.samplemanager.com:56105/covid-retests-for-plate/" + self.plate_id);
+      console.log("Basic " + btoa(whoo_username+':'+whoo_password));
+      this.xhr.setRequestHeader("Authorization", "Basic " + btoa(whoo_username+':'+whoo_password));
+      this.xhr.send();
+    } 
+    else {
+      console.log('not getting json from the server in this mode...');
+      self.make_main_data();
+    }
   }
 
   load_file() {
@@ -128,7 +155,7 @@ class whooData {
     this.fr.onload=function() { // this function runs once the file is loaded - all the action is in here
       d3.select('#inputfile').style('display', 'none'); // hide file input once a file is loaded
       d3.select('#plate_title').html('Plate file: ' + self.input_file.name); // display file name
-      self.load_json_from_server();
+      self.process_data();
     }
     this.input_file = document.getElementById('inputfile').files[0];
     this.fr.readAsText(document.getElementById('inputfile').files[0]);
@@ -145,20 +172,15 @@ class whooData {
      *  - we ignore anything appearing after a blank line in any of these sections
      *    (eg at the end of Results there is "Analysis Type" and "Reference Sample" info)
      */
-    // make an object that points from well -> retest status
-    this.retest_map = {};
-    for (let row of this.retest_data.samples) {
-      this.retest_map[row['well']] = row['retest_status'];
-    }
-    console.log(this.retest_map);
     let file_string = this.fr.result;
     // a legacy replacement for old files where N1 was N GENE
-    file_string = file_string.replaceAll('N GENE', 'N1')
+    file_string = file_string.replaceAll('N GENE', 'N1').replaceAll('\r', '')
     let split_by_blank_lines = file_string.split(/\n\s*\n/); // split file by blank lines
     this.raw_data = {'header': {}}; // Parsing header info...
     for (let line of split_by_blank_lines[0].split('\n')) {
       this.raw_data.header[line.split(' = ')[0].slice(2,)] = line.split(' = ')[1];
     }
+    this.plate_id = this.raw_data.header['Experiment Name'];
     for (let block of split_by_blank_lines) {
       if (block[0]=='[') {
         let block_name = block.slice(1,block.indexOf(']'));
@@ -167,7 +189,7 @@ class whooData {
       }
     }
     if (whoo_DEBUG) console.log('file loaded');
-    this.make_main_data();
+    this.load_json_from_server();
   }
 
   row_by_well(well) {
@@ -222,6 +244,14 @@ class whooData {
      * "FinalCall" - possibly changed by plate failures or overrides
      */
     if (whoo_DEBUG) console.log('in make_main_data()');
+    // make an object that points from well -> retest status (if json request happened)
+    this.retest_map = {};
+    if (this.retest_data) {
+      for (let row of this.retest_data.samples) {
+        this.retest_map[row['well']] = row['retest_status'];
+      }
+      console.log(this.retest_map);
+    }   
     let self = this;
     this.main_data = [];
     this.plate_errors = [];
@@ -236,12 +266,18 @@ class whooData {
     for (let group of d3.groups(this.raw_data['Results'], d => d.Well)) { // groups data by well number
       let rows = group[1];
       let tmp_obj = {'Well': group[0], 'Well Position': rows[0]['Well Position']};
-      for (let row of rows) {
-        tmp_obj['Retest'] = this.retest_map[row['Well Position']] || '';
+      if (this.retest_data) {
+        if (!(tmp_obj['Well Position'] in this.retest_map)) continue; // exclude samples not in the json sample map
+        tmp_obj['Retest'] = this.retest_map[tmp_obj['Well Position']];
+      } else {
+        tmp_obj['Retest'] = '';
+      }
+      tmp_obj['Sample Name'] = this.sample_name_map[tmp_obj['Well']];
+      tmp_obj['is_control'] = ((tmp_obj['Sample Name'].slice(0,3) == 'NTC') || (tmp_obj['Sample Name'].slice(0,3) == 'PTC'));
+      for (let row of rows) { // iterating over 3 rows for 3 targets (for this well)
         tmp_obj[row['Target Name'] + ' CT'] = parseFloat(row['CT']); // adding CT values for the appropriate target
         // Adding fluorescence data
         tmp_obj[row['Target Name'] + ' FC'] = this.extract_fluorescence_data(this.raw_data['Amplification Data'], group[0], row['Target Name']); 
-        tmp_obj['Sample Name'] = this.sample_name_map[row['Well']];
         // Recording the CT cutoffs  - This is very redundant/inefficient, there are only three key: value pairs
         // but we just keep resetting them as we go through the data.
         // Have to do the replace because THESE MANIACS export data with commas for thousands etc.
@@ -360,7 +396,7 @@ class whooData {
      * there will be other class styling, but these are the immutable parts
      */
     let class_str = 'raw_call_'+d['RawCall'];
-    if ((this.ntc_well_positions.indexOf(d['Well Position']) > -1) || (this.ptc_well_positions.indexOf(d['Well Position']) > -1)) class_str += ' whoo_control';
+    if (d.is_control) class_str += ' whoo_control';
     if (this.ntc_well_positions.indexOf(d['Well Position']) > -1) class_str += ' whoo_ntc';
     if (this.ptc_well_positions.indexOf(d['Well Position']) > -1) class_str += ' whoo_ptc';
     return class_str;
@@ -378,7 +414,7 @@ class whooData {
         .attr('class', function(d) { return 'whoo_item whoo_table_row ' + d['whoo_class_base']; })
         .style('background-color', d => whoo_colors[d.FinalCall])
         .on('mouseover', function(event, d) { d3.selectAll('.svg_data').classed('hovered_data', td => td.Well==d.Well); }) //hover on table -> hover display on svg
-        .on('mouseout', function(event, d) { d3.selectAll('.svg_data').classed('hovered_data', false); }) // nothing hovered
+        .on('mouseout', function() { d3.selectAll('.svg_data').classed('hovered_data', false); }) // nothing hovered
         .on('click', function(event, d) { self.highlight_well(d.Well, event.shiftKey); });
 
     
@@ -450,11 +486,11 @@ class whooData {
       self.filtered_call = call;
       if (self.filtered_call) {
         if (self.filtered_call == 'controls') {
-          d3.selectAll('.whoo_table_row').classed('filtered_out_data', d => control_names.indexOf(d['Sample Name']) == -1);
-          self.filtered_data = self.main_data.filter(d => control_names.indexOf(d['Sample Name']) > -1);
+          d3.selectAll('.whoo_table_row').classed('filtered_out_data', d => (!d.is_control));
+          self.filtered_data = self.main_data.filter(d => d.is_control);
         } else {
-          d3.selectAll('.whoo_table_row').classed('filtered_out_data', d => ((d.FinalCall!=self.filtered_call) || (control_names.indexOf(d['Sample Name']) > -1)));
-          self.filtered_data = self.main_data.filter(d => ((d.FinalCall==self.filtered_call) && (control_names.indexOf(d['Sample Name']) == -1)));
+          d3.selectAll('.whoo_table_row').classed('filtered_out_data', d => ((d.FinalCall!=self.filtered_call) || (d.is_control)));
+          self.filtered_data = self.main_data.filter(d => ((d.FinalCall==self.filtered_call) && (!d.is_control)));
         }
       } else {
         d3.selectAll('.whoo_table_row').classed('filtered_out_data', false);
@@ -476,7 +512,7 @@ class whooData {
       .append('div')
         .attr('class', 'whoo_button result_button summary_result')
         .style('background-color', d => whoo_colors[d])
-        .html(function(d) { return String(self.main_data.filter(td => ((td.FinalCall==d) && (control_names.indexOf(td['Sample Name']) == -1))).length) + ' ' + d; })
+        .html(function(d) { return String(self.main_data.filter(td => ((td.FinalCall==d) && (!td.is_control))).length) + ' ' + d; })
         .on('click', function(event, d) { self.filter_by_call(d); });
     
     d3.select('#summary_display')
@@ -681,7 +717,7 @@ class whooData {
      */
     let self = this;
     d3.select('#summary_display').selectAll('.summary_result')
-      .html(function(d) { return String(self.main_data.filter(td => ((td.FinalCall==d) && (control_names.indexOf(td['Sample Name']) == -1))).length) + ' ' + d; });
+      .html(function(d) { return String(self.main_data.filter(td => ((td.FinalCall==d) && (!td.is_control))).length) + ' ' + d; });
 
     this.svg.selectAll('.well_icon')
         .attr('fill', d => whoo_colors[d.FinalCall].replace('33%', '45%') );
@@ -735,7 +771,12 @@ class whooData {
   }
 }
 
-function setup() {
+function setup(use_server=true) {
+  if (!use_server) {
+    whoo_use_server = false;
+    whoo_username = 'dummy';
+    whoo_password = 'dummy';
+  }
   if (!whoo_username) { // if we're asking the user for the username / password
     d3.select('#inputfile').style('display', 'none');
     d3.select('#auth_popup').style('display', 'block');
