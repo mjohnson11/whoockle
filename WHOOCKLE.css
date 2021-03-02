@@ -74,6 +74,22 @@ body {
 
 /*#region*/ /* Popups */
 
+#auth_popup {
+  position: absolute;
+  z-index: 2;
+  left: 450px;
+  width: 300px;
+  top: 200px;
+  height: 200px;
+  background-color: #555;
+  display: none;
+  padding:20px;
+}
+
+#auth_popup p {
+  display: inline;
+}
+
 #plate_fail_popup {
   position: absolute;
   z-index: 2;
@@ -370,6 +386,10 @@ body {
 
 /* column sizes */
 
+#column_Retest {
+  width: 100px;
+}
+
 #column_Well {
   width: 100px;
 }
@@ -397,8 +417,6 @@ body {
 #column_RNaseP_Ct {
   width: 75px;
 }
-
-
 
 /*#endregion*/
 

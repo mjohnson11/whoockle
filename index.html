@@ -43,11 +43,11 @@
       <div id="TableZone">
         <div id="whoo_table_holder">
           <table id="whoo_table">
-            <col id="column_Well"><col id="column_Sample"><col id="column_RawCall"><col id="column_Override">
-            <col id="column_N1 Ct"><col id="column_RdRp Ct"><col id="column_RNaseP Ct">
+            <col id="column_Well"><col id="column_Retest"><col id="column_Sample"><col id="column_RawCall">
+            <col id="column_Override"><col id="column_N1 Ct"><col id="column_RdRp Ct"><col id="column_RNaseP Ct">
             <thead id="whoo_table_head">
               <tr>
-                <th>Well</th><th>Sample</th><th>RawCall</th><th>Override</th><th>N1 Ct</th><th>RdRp Ct</th><th>RNaseP Ct</th>
+                <th>Well</th><th>Retest?</th><th>Sample</th><th>RawCall</th><th>Override</th><th>N1 Ct</th><th>RdRp Ct</th><th>RNaseP Ct</th>
               </tr>
             </thead>
             <tbody id="whoo_table_body">
@@ -68,6 +68,14 @@
       <h1>Issues with this plate detected</h1>
       <p id="plate_error_text"></p>
     </div>
+    <div id='auth_popup'>
+      <h2>API credentials</h2>
+      <p>username</p><br />
+      <input type="text" name="username" id="auth_username" class="form_text"/><br />
+      <p>password</p><br />
+      <input type="password" name="password" id="auth_password" class="form_text"/><br />
+      <div id="auth_submit" class="whoo_button">Submit</div>
+    </div>  
   </div>
 </body>
 </html>

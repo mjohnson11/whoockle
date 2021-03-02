@@ -32,6 +32,10 @@ var whoo_possible_results = ['Positive', 'Inconclusive', 'Rerun-A', 'Rerun-B', '
 
 var whoo_rows = ['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P'];
 
+// Can hard code these locally in the future (should not be shared)
+var whoo_username;
+var whoo_password;
+
 class whooData {
   /**
    * This class holds all the data and variables associated with a single open file
@@ -81,11 +85,13 @@ class whooData {
      */
     this.format_for_export();
     let output_name = 'Processed_' + this.input_file.name.replace('.txt', '.csv');
-    let plate_ID = this.input_file.name.split(' ')[1].split('.')[0];
+    let plate_ID = this.raw_data.header['Experiment Name'];
     let a = document.createElement('a');
     let export_header = 'QpcrPlateId: ' + plate_ID + '\n';
     export_header += 'InstrumentSerialNumber: ' + this.raw_data.header['Instrument Serial Number'] + '\n\n';
-    let output_file = new Blob([export_header + d3.csvFormat(this.export_data)], {type: 'text/plain'});
+    let output_text = export_header + d3.csvFormat(this.export_data);
+    // weird replaceAll makes sure we get output in windows format
+    let output_file = new Blob([output_text.replaceAll('\r\n', '\n').replaceAll('\n', '\r\n')], {type: 'text/plain'});
     
     a.href= URL.createObjectURL(output_file);
     a.download = output_name;
@@ -94,9 +100,43 @@ class whooData {
     URL.revokeObjectURL(a.href);
   }
 
+  load_json_from_server() {
+    //this.process_data();
+    let self = this;
+    this.xhr = new XMLHttpRequest();
+    this.xhr.withCredentials = true;
+    this.xhr.addEventListener("readystatechange", function() {
+      if(this.readyState === 4) {
+        console.log(this.responseText);
+        self.retest_data = JSON.parse(this.response);
+        self.process_data();
+      }
+    });
+    this.xhr.open("GET", "http://hucldevint.samplemanager.com:56105/covid-retests-for-plate/B032622");
+    console.log("Basic " + btoa(whoo_username+':'+whoo_password));
+    this.xhr.setRequestHeader("Authorization", "Basic " + btoa(whoo_username+':'+whoo_password));
+    this.xhr.send();
+  }
+
   load_file() {
     /**
-     * Loads a QuantStudio 7 Flex txt output file
+     * Loads the input file, then calls the json request, with a callback to process data
+     */
+    if (whoo_DEBUG) console.log('in load_file()');
+    this.fr = new FileReader(); 
+    let self = this; // to avoid "this" pointing to the wrong thing inside the onload
+    this.fr.onload=function() { // this function runs once the file is loaded - all the action is in here
+      d3.select('#inputfile').style('display', 'none'); // hide file input once a file is loaded
+      d3.select('#plate_title').html('Plate file: ' + self.input_file.name); // display file name
+      self.load_json_from_server();
+    }
+    this.input_file = document.getElementById('inputfile').files[0];
+    this.fr.readAsText(document.getElementById('inputfile').files[0]);
+  }
+
+  process_data() {
+    /**
+     * Processes a QuantStudio 7 Flex txt output file
      * (see https://assets.thermofisher.com/TFS-Assets/LSG/manuals/4489825.pdf pgs. 59-66),
      * this function builds the raw_data object with properties for each part of the file:
      *  - One for the header information (stored as plain text)
@@ -105,32 +145,29 @@ class whooData {
      *  - we ignore anything appearing after a blank line in any of these sections
      *    (eg at the end of Results there is "Analysis Type" and "Reference Sample" info)
      */
-    if (whoo_DEBUG) console.log('in load_file()');
-    let fr = new FileReader(); 
-    let self = this; // to avoid "this" pointing to the wrong thing inside the onload
-    fr.onload=function() { // this function runs once the file is loaded - all the action is in here
-      d3.select('#inputfile').style('display', 'none'); // hide file input once a file is loaded
-      d3.select('#plate_title').html('Plate file: ' + self.input_file.name); // display file name
-      let file_string = fr.result;
-      // a legacy replacement for old files where N1 was N GENE
-      file_string = file_string.replaceAll('N GENE', 'N1')
-      let split_by_blank_lines = file_string.split(/\n\s*\n/); // split file by blank lines
-      self.raw_data = {'header': {}}; // Parsing header info...
-      for (let line of split_by_blank_lines[0].split('\n')) {
-        self.raw_data.header[line.split(' = ')[0].slice(2,)] = line.split(' = ')[1];
-      }
-      for (let block of split_by_blank_lines) {
-        if (block[0]=='[') {
-          let block_name = block.slice(1,block.indexOf(']'));
-          console.log(block_name);
-          self.raw_data[block_name] = d3.tsvParse(block.slice(block.indexOf('\n')+1));
-        }
-      }
-      if (whoo_DEBUG) console.log('file loaded');
-      self.make_main_data();
+    // make an object that points from well -> retest status
+    this.retest_map = {};
+    for (let row of this.retest_data.samples) {
+      this.retest_map[row['well']] = row['retest_status'];
     }
-    this.input_file = document.getElementById('inputfile').files[0];
-    fr.readAsText(document.getElementById('inputfile').files[0]);
+    console.log(this.retest_map);
+    let file_string = this.fr.result;
+    // a legacy replacement for old files where N1 was N GENE
+    file_string = file_string.replaceAll('N GENE', 'N1')
+    let split_by_blank_lines = file_string.split(/\n\s*\n/); // split file by blank lines
+    this.raw_data = {'header': {}}; // Parsing header info...
+    for (let line of split_by_blank_lines[0].split('\n')) {
+      this.raw_data.header[line.split(' = ')[0].slice(2,)] = line.split(' = ')[1];
+    }
+    for (let block of split_by_blank_lines) {
+      if (block[0]=='[') {
+        let block_name = block.slice(1,block.indexOf(']'));
+        console.log(block_name);
+        this.raw_data[block_name] = d3.tsvParse(block.slice(block.indexOf('\n')+1));
+      }
+    }
+    if (whoo_DEBUG) console.log('file loaded');
+    this.make_main_data();
   }
 
   row_by_well(well) {
@@ -200,6 +237,7 @@ class whooData {
       let rows = group[1];
       let tmp_obj = {'Well': group[0], 'Well Position': rows[0]['Well Position']};
       for (let row of rows) {
+        tmp_obj['Retest'] = this.retest_map[row['Well Position']] || '';
         tmp_obj[row['Target Name'] + ' CT'] = parseFloat(row['CT']); // adding CT values for the appropriate target
         // Adding fluorescence data
         tmp_obj[row['Target Name'] + ' FC'] = this.extract_fluorescence_data(this.raw_data['Amplification Data'], group[0], row['Target Name']); 
@@ -232,9 +270,8 @@ class whooData {
     let self = this;
     if (whoo_DEBUG) console.log('in check_plate_data()');
     this.plate_failures = [];
-    let ntc_sample_names = ['NTC-W', 'NTC-P'];
-    this.ntc_data = this.main_data.filter(row => (ntc_sample_names.indexOf(row['Sample Name']) > -1));
-    this.ptc_data = this.main_data.filter(row => (row['Sample Name'] == 'PTC'));
+    this.ntc_data = this.main_data.filter(row => (row['Sample Name'].slice(0,3) == 'NTC'));
+    this.ptc_data = this.main_data.filter(row => (row['Sample Name'].slice(0,3) == 'PTC'));
     this.ntc_well_positions = d3.map(this.ntc_data, row => row['Well Position']);
     this.ptc_well_positions = d3.map(this.ptc_data, row => row['Well Position']);
     
@@ -284,9 +321,19 @@ class whooData {
       } else if ( ( (!(d['N1 CT']<38)) && (!(d['RDRP CT']<38)) ) && (d['RNASEP CT']<34) ) {
         d['RawCall'] = 'Negative'; // If N1 CT > 38 AND RDRP CT > 38 AND RNASEP CT < 34, call Negative
       } else if ( (d['N1 CT']<38) || (d['RDRP CT']<38) ) {
-        d['RawCall'] = 'Rerun-B'; // If N1 CT < 38 OR RDRP CT < 38, call Rerun-B
+        if (d['Retest']=='Retest B') {
+          d['RawCall'] = 'Positive';          // Two retest B's in a row -> Positive 
+        } else if (d['Retest']=='Retest A') {
+          d['Rawcall'] = 'Inconclusive';      // Retest A then Retest B -> Inconclusive
+        } else {
+          d['RawCall'] = 'Rerun-B';           // If N1 CT < 38 OR RDRP CT < 38 (and not already a retest), call Rerun-B
+        }
       } else {
-        d['RawCall'] = 'Rerun-A'; // ELSE call Rerun-A
+        if ((d['Retest']=='Retest B') || (d['Retest']=='Retest A')) {
+          d['RawCall'] = 'Inconclusive';          // Retest A or B followed by Retest A -> Inconclusive
+        } else {
+          d['RawCall'] = 'Rerun-A';               // ELSE call Rerun-A (if not already a retest)
+        }
       }
       if (this.plate_errors.length>0) {     // If there are any plate-failure errors, set everything to Rerun-A (by override)
         d['Override'] = true;
@@ -334,7 +381,9 @@ class whooData {
         .on('mouseout', function(event, d) { d3.selectAll('.svg_data').classed('hovered_data', false); }) // nothing hovered
         .on('click', function(event, d) { self.highlight_well(d.Well, event.shiftKey); });
 
+    
     d3.selectAll('.whoo_table_row').append('td').attr('class', 'Well_row_entry').html(d => d['Well Position']);
+    d3.selectAll('.whoo_table_row').append('td').attr('class', 'Retest_row_entry').html(d => d['Retest']);
     d3.selectAll('.whoo_table_row').append('td').attr('class', 'SampleName_row_entry').html(d => d['Sample Name']);
     d3.selectAll('.whoo_table_row').append('td').attr('class', 'RawCall_row_entry').html(d => d.RawCall);
     let override_entry = d3.selectAll('.whoo_table_row').append('td').attr('class', 'Override_row_entry');
@@ -687,7 +736,19 @@ class whooData {
 }
 
 function setup() {
-  //parse_QS7F_txt_output('test_data/2021-02-17 135556.txt');
+  if (!whoo_username) { // if we're asking the user for the username / password
+    d3.select('#inputfile').style('display', 'none');
+    d3.select('#auth_popup').style('display', 'block');
+    d3.select('#auth_submit').on("click", function() {
+      whoo_username = d3.select('#auth_username').property('value');
+      whoo_password = d3.select('#auth_password').property('value');
+      d3.select('#inputfile').style('display', 'block');
+      d3.select('#auth_popup').style('display', 'none');
+    })
+  } else {  // if it is already hard coded in above
+    d3.select('#inputfile').style('display', 'block');
+    d3.select('#auth_popup').style('display', 'none');
+  }
 }
 
 function new_file_handler() {
