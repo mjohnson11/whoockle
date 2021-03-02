@@ -92,8 +92,8 @@ class whooData {
       for (let c of ['N1 CT', 'RDRP CT', 'RNASEP CT']) {
         tmp_row[c.split(' ')[0]] = (d[c]) ? d[c].toFixed(1) : '45'; // yeilds empty string if CT is NaN, the number formatted to one dec. point if not
       }
-      // Only Positive, Negative, and Inconclusive calls are cleared to report. Control wells are always cleared to report.
-      tmp_row['ClearToReport'] = ((notCleared.indexOf(d['FinalCall']) == -1) || (d.is_control));
+      // Only Positive, Negative, and Inconclusive calls are cleared to report. Control wells are never cleared to report.
+      tmp_row['ClearToReport'] = ((notCleared.indexOf(d['FinalCall']) == -1) && (!d.is_control));
       //for (let c of simple_columns) { // adding a few extra columns, currently removed so parser can work easier
       //  tmp_row[c] = d[c];
       //}
