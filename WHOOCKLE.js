@@ -8,8 +8,8 @@ var whoo_colors = {
   'Inconclusive': 'hsl(34, 100%, 33%)',
   'Rerun-A': 'hsl(34, 100%, 33%)',
   'Rerun-B': 'hsl(34, 100%, 33%)',
-  'Valid': 'hsl(0, 0%, 33%)',
-  'Invalid': 'hsl(0, 0%, 20%)'
+  'Valid': 'hsl(0, 0%, 20%)',
+  'Invalid': 'hsl(0, 100%, 20%)'
 };
 
 var whoo_gene_colors = {
