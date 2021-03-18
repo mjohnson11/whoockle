@@ -418,6 +418,10 @@ body {
   width: 75px;
 }
 
+.control_hidden_element {
+  display: none;
+}
+
 /*#endregion*/
 
 /*#region*/ /* SVG */

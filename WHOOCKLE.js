@@ -1,13 +1,15 @@
 var whoo_holder;
 
-var whoo_DEBUG = true;
+var whoo_DEBUG = false;
 
 var whoo_colors = {
   'Positive': 'hsl(350, 100%, 33%)',
   'Negative': 'hsl(0, 0%, 33%)',
   'Inconclusive': 'hsl(34, 100%, 33%)',
   'Rerun-A': 'hsl(34, 100%, 33%)',
-  'Rerun-B': 'hsl(34, 100%, 33%)'
+  'Rerun-B': 'hsl(34, 100%, 33%)',
+  'Valid': 'hsl(0, 0%, 33%)',
+  'Invalid': 'hsl(0, 0%, 20%)'
 };
 
 var whoo_gene_colors = {
@@ -26,20 +28,10 @@ var whoo_export_map = {
 }
 
 // THE EXPORT MAPPING FOR CONTROLS IS WEIRD
-// Basically Positive means it worked, Negative means it failed
-// For NTC, we only export positive if we get Rerun-A, which is what we expect, and otherwise report negative
-// For PTC, we only export positive if we get positive, which is what we expect, and otherwise report negative
+// Basically Positive means it worked (Valid based on logic in call_wells), Negative for Invalid
 var whoo_export_map_controls = {
-  'NTC': {'Negative': 'NEGATIVE for SARS-CoV-2',
-          'Positive': 'NEGATIVE for SARS-CoV-2',
-          'Inconclusive': 'NEGATIVE for SARS-CoV-2',
-          'Rerun-B': 'NEGATIVE for SARS-CoV-2',
-          'Rerun-A': 'POSITIVE for SARS-CoV-2'},
-  'PTC': {'Negative': 'NEGATIVE for SARS-CoV-2',
-          'Positive': 'POSITIVE for SARS-CoV-2',
-          'Inconclusive': 'NEGATIVE for SARS-CoV-2',
-          'Rerun-B': 'NEGATIVE for SARS-CoV-2',
-          'Rerun-A': 'NEGATIVE for SARS-CoV-2'},
+  'Invalid': 'NEGATIVE for SARS-CoV-2',
+  'Valid': 'POSITIVE for SARS-CoV-2'
 }
 
 var whoo_table_row_height = 20;
@@ -64,13 +56,13 @@ class whooData {
   
   load_from_save() {
     /**
-     * A function for taking already processed data and re-loading it
+     * Possible addition: A function for taking already processed data and re-loading it
      */
   }
 
   save() {
     /**
-     * A function for saving data in a format that can be reopened
+     * Possible addition: A function for saving data in a format that can be reopened
      */
   }
 
@@ -85,7 +77,7 @@ class whooData {
     for (let d of this.main_data) {
       let tmp_row = {'Position': d['Well Position']};
       if (d.is_control) {
-        tmp_row['InterpretiveResult'] = whoo_export_map_controls[d['Sample Name'].slice(0,3)][d['FinalCall']];
+        tmp_row['InterpretiveResult'] = whoo_export_map_controls[d['FinalCall']];
       } else {
         tmp_row['InterpretiveResult'] = whoo_export_map[d['FinalCall']];
       }
@@ -122,20 +114,29 @@ class whooData {
   }
 
   load_json_from_server() {
-    //this.process_data();
+    /**
+     * Makes a GET request to samplemanager to get the sample map for the plate ID
+     * Whether it works or not, goes ahead and calls make_main_data
+     */
     let self = this;
     if (whoo_use_server) {
       this.xhr = new XMLHttpRequest();
+      this.xhr.onerror = function() {
+        console.log('GET request error, proceeding without a sample map...')
+        self.make_main_data(); // IF IT FAILS based on a CORS error, JUST GO FORWARD without the sample map
+      };
       this.xhr.withCredentials = true;
       this.xhr.addEventListener("readystatechange", function() {
         if(this.readyState === 4) {
           console.log(this.responseText);
           self.retest_data = JSON.parse(this.response);
           self.make_main_data();
+        } else {
+          console.log('Working on GET request...')
         }
       });
       this.xhr.open("GET", "http://hucldevint.samplemanager.com:56105/covid-retests-for-plate/" + self.plate_id);
-      console.log("Basic " + btoa(whoo_username+':'+whoo_password));
+      if (whoo_DEBUG) console.log("Basic " + btoa(whoo_username+':'+whoo_password));
       this.xhr.setRequestHeader("Authorization", "Basic " + btoa(whoo_username+':'+whoo_password));
       this.xhr.send();
     } 
@@ -184,7 +185,7 @@ class whooData {
     for (let block of split_by_blank_lines) {
       if (block[0]=='[') {
         let block_name = block.slice(1,block.indexOf(']'));
-        console.log(block_name);
+        if (whoo_DEBUG) console.log('Loading', block_name);
         this.raw_data[block_name] = d3.tsvParse(block.slice(block.indexOf('\n')+1));
       }
     }
@@ -250,7 +251,9 @@ class whooData {
       for (let row of this.retest_data.samples) {
         this.retest_map[row['well']] = row['retest_status'];
       }
-      console.log(this.retest_map);
+      console.log('Sample map from server:', this.retest_map);
+    } else {
+      console.log('Was not able to retrieve sample map from server');
     }   
     let self = this;
     this.main_data = [];
@@ -346,39 +349,53 @@ class whooData {
      * Calls each well as Positive, Negative, Inconclusive, Rerun-A, or Rerun-B
      */
     if (whoo_DEBUG) console.log('in call_wells()');
-    console.log(this.plate_failures, this.loading_errors);
+    if (whoo_DEBUG) console.log('Plate failures and warnings', this.plate_failures, this.loading_errors);
     for (let d of this.main_data) {
       // Note: "Undetermined" CTs are NaN here. NaN compared to a number will always return false
       // Therefore all comparisons with CTs will ask if a CT is less than some threshold
-      if ( (d['N1 CT']<30) || (d['RDRP CT']<30) ) { 
-        d['RawCall'] = 'Positive'; // If N1 CT < 30 OR RDRP CT < 30, call Positive
-      } else if ( (d['N1 CT']<38) && (d['RDRP CT']<38) ) {
-        d['RawCall'] = 'Positive'; // If N1 CT < 38 AND RDRP CT < 38, call Positive
-      } else if ( ( (!(d['N1 CT']<38)) && (!(d['RDRP CT']<38)) ) && (d['RNASEP CT']<34) ) {
-        d['RawCall'] = 'Negative'; // If N1 CT > 38 AND RDRP CT > 38 AND RNASEP CT < 34, call Negative
-      } else if ( (d['N1 CT']<38) || (d['RDRP CT']<38) ) {
-        if (d['Retest']=='Retest B') {
-          d['RawCall'] = 'Positive';          // Two retest B's in a row -> Positive 
-        } else if (d['Retest']=='Retest A') {
-          d['Rawcall'] = 'Inconclusive';      // Retest A then Retest B -> Inconclusive
-        } else {
-          d['RawCall'] = 'Rerun-B';           // If N1 CT < 38 OR RDRP CT < 38 (and not already a retest), call Rerun-B
-        }
-      } else {
-        if ((d['Retest']=='Retest B') || (d['Retest']=='Retest A')) {
-          d['RawCall'] = 'Inconclusive';          // Retest A or B followed by Retest A -> Inconclusive
-        } else {
-          d['RawCall'] = 'Rerun-A';               // ELSE call Rerun-A (if not already a retest)
-        }
-      }
-      if (this.plate_errors.length>0) {     // If there are any plate-failure errors, set everything to Rerun-A (by override)
-        d['Override'] = true;
-        d['OverrideCall'] = 'Rerun-A';
-        d['FinalCall'] = 'Rerun-A';    // FinalCall will be equal to RawCall when Override is false, and OverrideCall when Override is true
-      } else {                              // ELSE:
-        d['Override'] = false;
+
+      // Specific logic for controls:
+      if (d['Sample Name'].slice(0,3) == 'NTC') {
+        // For the NTC to be valid, all 3 CTs must be undefined (asking that they are not <45 works in this case)
+        d['RawCall'] = ( (d['N1 CT']<45) || (d['RDRP CT']<45) || (d['RNASEP CT']<45) ) ? 'Invalid' : 'Valid';
         d['OverrideCall'] = d['RawCall'];   // Override call defaults to the RawCall, can be changed by the user if Override is true
         d['FinalCall'] = d['RawCall'];      // FinalCall will be equal to RawCall when Override is false, and OverrideCall when Override is true
+      } else if (d['Sample Name'].slice(0,3) == 'PTC') {
+        // For the NTC to be valid, all 3 CTs must be <30
+        d['RawCall'] = ( (d['N1 CT']<30) || (d['RDRP CT']<30) || (d['RNASEP CT']<30) ) ? 'Valid' : 'Invalid';
+        d['OverrideCall'] = d['RawCall'];   // Override call defaults to the RawCall, can be changed by the user if Override is true
+        d['FinalCall'] = d['RawCall'];      // FinalCall will be equal to RawCall when Override is false, and OverrideCall when Override is true
+      } else { // Now starting the logic for non-control wells:
+        if ( (d['N1 CT']<30) || (d['RDRP CT']<30) ) { 
+          d['RawCall'] = 'Positive'; // If N1 CT < 30 OR RDRP CT < 30, call Positive
+        } else if ( (d['N1 CT']<38) && (d['RDRP CT']<38) ) {
+          d['RawCall'] = 'Positive'; // If N1 CT < 38 AND RDRP CT < 38, call Positive
+        } else if ( ( (!(d['N1 CT']<38)) && (!(d['RDRP CT']<38)) ) && (d['RNASEP CT']<34) ) {
+          d['RawCall'] = 'Negative'; // If N1 CT > 38 AND RDRP CT > 38 AND RNASEP CT < 34, call Negative
+        } else if ( (d['N1 CT']<38) || (d['RDRP CT']<38) ) {
+          if (d['Retest']=='Retest B') {
+            d['RawCall'] = 'Positive';          // Two retest B's in a row -> Positive 
+          } else if (d['Retest']=='Retest A') {
+            d['Rawcall'] = 'Inconclusive';      // Retest A then Retest B -> Inconclusive
+          } else {
+            d['RawCall'] = 'Rerun-B';           // If N1 CT < 38 OR RDRP CT < 38 (and not already a retest), call Rerun-B
+          }
+        } else {
+          if ((d['Retest']=='Retest B') || (d['Retest']=='Retest A')) {
+            d['RawCall'] = 'Inconclusive';          // Retest A or B followed by Retest A -> Inconclusive
+          } else {
+            d['RawCall'] = 'Rerun-A';               // ELSE call Rerun-A (if not already a retest)
+          }
+        }
+        if (this.plate_errors.length>0) {     // If there are any plate-failure errors, set everything to Rerun-A (by override)
+          d['Override'] = true;
+          d['OverrideCall'] = 'Rerun-A';
+          d['FinalCall'] = 'Rerun-A';    // FinalCall will be equal to RawCall when Override is false, and OverrideCall when Override is true
+        } else {                              // ELSE:
+          d['Override'] = false;
+          d['OverrideCall'] = d['RawCall'];   // Override call defaults to the RawCall, can be changed by the user if Override is true
+          d['FinalCall'] = d['RawCall'];      // FinalCall will be equal to RawCall when Override is false, and OverrideCall when Override is true
+        }
       }
       d['whoo_class_base'] = this.get_whoo_class_base(d);
     }
@@ -428,11 +445,11 @@ class whooData {
     d3.selectAll('.whoo_table_row').append('td').attr('class', 'CT_row_entry').html(d => (d['RNASEP CT']) ? d['RNASEP CT'].toFixed(1) : 'Und.');
     override_entry.append('input')
       .attr('type', 'checkbox')
-      .attr('class', 'override_checkbox')
+      .attr('class', d => d.is_control ? 'control_hidden_element' : 'override_checkbox') // control checkboxes are hidden and never can be used
       .property('checked', d => d.Override)
       .on('change', function(event, d) { self.override_change(d, this.parentNode); }); // checkbox change triggers function call
     let override_select = override_entry.append('select')
-      .attr('class', 'override_select')
+      .attr('class', d => d.is_control ? 'control_hidden_element' :'override_select')  // control selects are hidden and never can be used
       .style('display', d => (d.Override) ? 'inline' : 'none')
       .on('change', function(event, d) {  
         d.OverrideCall = this.value;     // select box change triggers OverrideCall to change
@@ -771,6 +788,13 @@ class whooData {
   }
 }
 
+function submit_user_pass_form() {
+  whoo_username = d3.select('#auth_username').property('value');
+  whoo_password = d3.select('#auth_password').property('value');
+  d3.select('#inputfile').style('display', 'block');
+  d3.select('#auth_popup').style('display', 'none');
+}
+
 function setup(use_server=true) {
   if (!use_server) {
     whoo_use_server = false;
@@ -780,12 +804,8 @@ function setup(use_server=true) {
   if (!whoo_username) { // if we're asking the user for the username / password
     d3.select('#inputfile').style('display', 'none');
     d3.select('#auth_popup').style('display', 'block');
-    d3.select('#auth_submit').on("click", function() {
-      whoo_username = d3.select('#auth_username').property('value');
-      whoo_password = d3.select('#auth_password').property('value');
-      d3.select('#inputfile').style('display', 'block');
-      d3.select('#auth_popup').style('display', 'none');
-    })
+    d3.select('#auth_password').on("change", submit_user_pass_form); // fires when user presses enter
+    d3.select('#auth_submit').on("click", submit_user_pass_form);    // or they can click the button
   } else {  // if it is already hard coded in above
     d3.select('#inputfile').style('display', 'block');
     d3.select('#auth_popup').style('display', 'none');
