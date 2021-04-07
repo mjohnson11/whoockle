@@ -135,7 +135,7 @@ class whooData {
           console.log('Working on GET request...')
         }
       });
-      this.xhr.open("GET", "http://hucldevint.samplemanager.com:56105/covid-retests-for-plate/" + self.plate_id);
+      this.xhr.open("GET", "http://huclint.samplemanager.com:56105/covid-retests-for-plate/" + self.plate_id);
       if (whoo_DEBUG) console.log("Basic " + btoa(whoo_username+':'+whoo_password));
       this.xhr.setRequestHeader("Authorization", "Basic " + btoa(whoo_username+':'+whoo_password));
       this.xhr.send();
