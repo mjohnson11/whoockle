@@ -376,7 +376,7 @@ class whooData {
           if (d['Retest']=='Retest B') {
             d['RawCall'] = 'Positive';          // Two retest B's in a row -> Positive 
           } else if (d['Retest']=='Retest A') {
-            d['Rawcall'] = 'Inconclusive';      // Retest A then Retest B -> Inconclusive
+            d['RawCall'] = 'Inconclusive';      // Retest A then Retest B -> Inconclusive
           } else {
             d['RawCall'] = 'Rerun-B';           // If N1 CT < 38 OR RDRP CT < 38 (and not already a retest), call Rerun-B
           }
