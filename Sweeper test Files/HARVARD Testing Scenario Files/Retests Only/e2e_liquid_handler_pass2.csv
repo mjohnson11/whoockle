@@ -1,8 +1,0 @@
-QpcrPlateId: 2010008999
-StoragePlateId: 2010008111
-Date: 01/11/2021
-
-Position,TubeID,ScanError,SRCRack,SRCPos,SRCTubeID,Volume,Error,SRCRackID,GridPos,SiteOnGrid,TipNumber,DetectVol,Time
-C10,,0,LVL Matrix Tuberack,A10,D-0000055059,2,0,SrcA1,49,1,4,,15:25:41
-C11,,0,LVL Matrix Tuberack,A11,D-0000055060,2,0,SrcA1,49,1,5,,15:25:41
-C12,,0,LVL Matrix Tuberack,A12,D-0000055061,2,0,SrcA1,49,1,6,,15:25:41
