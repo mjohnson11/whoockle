@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <!-- FONT
+  –––––––––––––––––––––––––––––––––––––––––––––––––– -->
+  <link href="https://fonts.googleapis.com/css?family=Crimson+Text&display=swap" rel="stylesheet" type="text/css">
+
+  <!-- CSS
+  –––––––––––––––––––––––––––––––––––––––––––––––––– -->
+  <link rel="stylesheet" href="WHOOCKLE.css">
+  <link rel="stylesheet" href="retest_scanning.css">
+
+  <!-- JS
+  –––––––––––––––––––––––––––––––––––––––––––––––––– -->
+  <script src="https://d3js.org/d3.v6.min.js"></script>
+  <script src="retest_scanning.js"></script>
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/svg+xml" href="Favicon.svg">
+
+</head>
+<body>
+  <div id="whoo_everything">
+    <input type="file" name="inputfile" id="inputfile" onchange="retest_scanning_setup()">
+    <div id="plate_title"></div>
+    <div id="whoo_table_holder_retest_scanning">
+      <table id="whoo_table_retest_scanning">
+        <thead id="whoo_table_head">
+          <tr>
+            <th>Well</th><th>Sample/BC</th><th>Retest</th><th>Pulled</th><th>N1 Ct</th><th>RdRp Ct</th><th>RNaseP Ct</th>
+          </tr>
+        </thead>
+        <tbody id="whoo_table_body">
+        </tbody>
+      </table>
+    </div>
+  </div>
+</body>
+</html>

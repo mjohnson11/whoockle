@@ -70,26 +70,30 @@ class whooData {
     /**
      * Formats a new dataframe for export
      * Columns: Well, Well Position, N1 CT, RDRP CT, RNASEP CT, RawCall, OverrideCall, Override, FinalCall
+     * If for for_retests is given as true, adds a Sample_ID (barcode) column, and only includes Retest rows
      */
     this.export_data = [];
+    this.retest_export_data = [];
     let notCleared = ['Rerun-A', 'Rerun-B'];
     //let simple_columns = ['RawCall', 'OverrideCall', 'Override'];
     for (let d of this.main_data) {
       let tmp_row = {'Position': d['Well Position']};
+      let retest_row = {'Well': d['Well Position'], 'Sample_ID': d['Sample_ID']};
       if (d.is_control) {
         tmp_row['InterpretiveResult'] = whoo_export_map_controls[d['FinalCall']];
       } else {
         tmp_row['InterpretiveResult'] = whoo_export_map[d['FinalCall']];
+        retest_row['Result'] = whoo_export_map[d['FinalCall']];
       }
       for (let c of ['N1 CT', 'RDRP CT', 'RNASEP CT']) {
-        tmp_row[c.split(' ')[0]] = (d[c]) ? d[c].toFixed(1) : '45'; // yeilds empty string if CT is NaN, the number formatted to one dec. point if not
+        tmp_row[c.split(' ')[0]] = (d[c]) ? d[c].toFixed(1) : '45'; // yeilds '45' if CT is NaN, the number formatted to one dec. point if not
+        retest_row[c.split(' ')[0]] = (d[c]) ? d[c].toFixed(1) : 'Und.'; // for retest output, yeilds 'Und.' if CT is NaN, the number formatted to one dec. point if not
       }
       // Only Positive, Negative, and Inconclusive calls are cleared to report. Control wells are never cleared to report.
       tmp_row['ClearToReport'] = ((notCleared.indexOf(d['FinalCall']) == -1) && (!d.is_control));
-      //for (let c of simple_columns) { // adding a few extra columns, currently removed so parser can work easier
-      //  tmp_row[c] = d[c];
-      //}
       this.export_data.push(tmp_row);
+
+      if (notCleared.indexOf(d['FinalCall']) > -1) this.retest_export_data.push(retest_row);
     }
   }
 
@@ -109,8 +113,15 @@ class whooData {
     a.href= URL.createObjectURL(output_file);
     a.download = output_name;
     a.click();
-
     URL.revokeObjectURL(a.href);
+    // exports only the retests for processing later by scan_retests.html
+    let retest_output_name = 'Retests_' + this.input_file.name.replace('.txt', '.csv');
+    let retest_output_file = new Blob([d3.csvFormat(this.retest_export_data)], {type: 'text/plain'});
+    let a2 = document.createElement('a');
+    a2.href= URL.createObjectURL(retest_output_file);
+    a2.download = retest_output_name;
+    a2.click();
+    URL.revokeObjectURL(a2.href);
   }
 
   load_json_from_server() {
@@ -245,11 +256,11 @@ class whooData {
      * "FinalCall" - possibly changed by plate failures or overrides
      */
     if (whoo_DEBUG) console.log('in make_main_data()');
-    // make an object that points from well -> retest status (if json request happened)
+    // make an object that points from well -> [retest status, sample_id (barcode)] (if json request happened)
     this.retest_map = {};
     if (this.retest_data) {
       for (let row of this.retest_data.samples) {
-        this.retest_map[row['well']] = row['retest_status'];
+        this.retest_map[row['well']] = [row['retest_status'], row['sample_vial_id']];
       }
       console.log('Sample map from server:', this.retest_map);
     } else {
@@ -271,9 +282,11 @@ class whooData {
       let tmp_obj = {'Well': group[0], 'Well Position': rows[0]['Well Position']};
       if (this.retest_data) {
         if (!(tmp_obj['Well Position'] in this.retest_map)) continue; // exclude samples not in the json sample map
-        tmp_obj['Retest'] = this.retest_map[tmp_obj['Well Position']];
+        tmp_obj['Retest'] = this.retest_map[tmp_obj['Well Position']][0];
+        tmp_obj['Sample_ID'] = this.retest_map[tmp_obj['Well Position']][1];
       } else {
         tmp_obj['Retest'] = '';
+        tmp_obj['Sample_ID'] = 'barcode_info_missing';
       }
       tmp_obj['Sample Name'] = this.sample_name_map[tmp_obj['Well']];
       tmp_obj['is_control'] = ((tmp_obj['Sample Name'].slice(0,3) == 'NTC') || (tmp_obj['Sample Name'].slice(0,3) == 'PTC'));

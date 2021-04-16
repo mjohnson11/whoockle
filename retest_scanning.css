@@ -1,0 +1,29 @@
+#whoo_table_holder_retest_scanning {
+  position: relative;
+  width: 800px;
+  top: 100px;
+  margin: 0px auto;
+}
+
+#whoo_table_retest_scanning {
+  position: absolute;
+  width: 100%;
+  top: 0px;
+  left: 0px;
+  border-collapse: collapse;
+  text-align: left;
+  cursor: default;
+  font-size:18px;
+}
+
+#column_Pulled {
+  width: 50px;
+}
+
+#column_Sample_ID {
+  width: 200px;
+}
+
+.scanned_row {
+  background-color: #066432;
+}
