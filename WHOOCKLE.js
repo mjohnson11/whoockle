@@ -35,6 +35,7 @@ var whoo_export_map_controls = {
 }
 
 var bcs_scanned = new Set();
+var bc_string = '';
 var scanning_bc_now = false;
 
 var whoo_table_row_height = 20;
