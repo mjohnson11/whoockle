@@ -34,6 +34,9 @@ var whoo_export_map_controls = {
   'Valid': 'POSITIVE for SARS-CoV-2'
 }
 
+var bcs_scanned = new Set();
+var scanning_bc_now = false;
+
 var whoo_table_row_height = 20;
 
 var whoo_possible_results = ['Positive', 'Inconclusive', 'Rerun-A', 'Rerun-B', 'Negative'];
@@ -73,27 +76,21 @@ class whooData {
      * If for for_retests is given as true, adds a Sample_ID (barcode) column, and only includes Retest rows
      */
     this.export_data = [];
-    this.retest_export_data = [];
     let notCleared = ['Rerun-A', 'Rerun-B'];
     //let simple_columns = ['RawCall', 'OverrideCall', 'Override'];
     for (let d of this.main_data) {
       let tmp_row = {'Position': d['Well Position']};
-      let retest_row = {'Well': d['Well Position'], 'Sample_ID': d['Sample_ID']};
       if (d.is_control) {
         tmp_row['InterpretiveResult'] = whoo_export_map_controls[d['FinalCall']];
       } else {
         tmp_row['InterpretiveResult'] = whoo_export_map[d['FinalCall']];
-        retest_row['Result'] = whoo_export_map[d['FinalCall']];
       }
       for (let c of ['N1 CT', 'RDRP CT', 'RNASEP CT']) {
         tmp_row[c.split(' ')[0]] = (d[c]) ? d[c].toFixed(1) : '45'; // yeilds '45' if CT is NaN, the number formatted to one dec. point if not
-        retest_row[c.split(' ')[0]] = (d[c]) ? d[c].toFixed(1) : 'Und.'; // for retest output, yeilds 'Und.' if CT is NaN, the number formatted to one dec. point if not
       }
       // Only Positive, Negative, and Inconclusive calls are cleared to report. Control wells are never cleared to report.
       tmp_row['ClearToReport'] = ((notCleared.indexOf(d['FinalCall']) == -1) && (!d.is_control));
       this.export_data.push(tmp_row);
-
-      if (notCleared.indexOf(d['FinalCall']) > -1) this.retest_export_data.push(retest_row);
     }
   }
 
@@ -114,14 +111,6 @@ class whooData {
     a.download = output_name;
     a.click();
     URL.revokeObjectURL(a.href);
-    // exports only the retests for processing later by scan_retests.html
-    let retest_output_name = 'Retests_' + this.input_file.name.replace('.txt', '.csv');
-    let retest_output_file = new Blob([d3.csvFormat(this.retest_export_data)], {type: 'text/plain'});
-    let a2 = document.createElement('a');
-    a2.href= URL.createObjectURL(retest_output_file);
-    a2.download = retest_output_name;
-    a2.click();
-    URL.revokeObjectURL(a2.href);
   }
 
   load_json_from_server() {
@@ -286,7 +275,7 @@ class whooData {
         tmp_obj['Sample_ID'] = this.retest_map[tmp_obj['Well Position']][1];
       } else {
         tmp_obj['Retest'] = '';
-        tmp_obj['Sample_ID'] = 'barcode_info_missing';
+        tmp_obj['Sample_ID'] = 'No BC';
       }
       tmp_obj['Sample Name'] = this.sample_name_map[tmp_obj['Well']];
       tmp_obj['is_control'] = ((tmp_obj['Sample Name'].slice(0,3) == 'NTC') || (tmp_obj['Sample Name'].slice(0,3) == 'PTC'));
@@ -450,7 +439,8 @@ class whooData {
     
     d3.selectAll('.whoo_table_row').append('td').attr('class', 'Well_row_entry').html(d => d['Well Position']);
     d3.selectAll('.whoo_table_row').append('td').attr('class', 'Retest_row_entry').html(d => d['Retest']);
-    d3.selectAll('.whoo_table_row').append('td').attr('class', 'SampleName_row_entry').html(d => d['Sample Name']);
+    d3.selectAll('.whoo_table_row').append('td').attr('class', 'SampleName_row_entry').html(function(d) {
+      return (d['Sample Name'] == 'Sample 1') ? d['Sample_ID'] : d['Sample Name'];});
     d3.selectAll('.whoo_table_row').append('td').attr('class', 'RawCall_row_entry').html(d => d.RawCall);
     let override_entry = d3.selectAll('.whoo_table_row').append('td').attr('class', 'Override_row_entry');
     d3.selectAll('.whoo_table_row').append('td').attr('class', 'CT_row_entry').html(d => (d['N1 CT']) ? d['N1 CT'].toFixed(1) : 'Und.'); // Or (||) override makes NaN show up as -
@@ -483,12 +473,25 @@ class whooData {
     d3.select('#next_well').on('click', function(e) { self.iterate_over_wells(1, e.shiftKey); });  // sets up listener for next button press
 
     d3.select('body').on('keydown', function(e) {
+      // table navigation with arrow keys
       if (['ArrowDown', 'ArrowRight'].indexOf(e.key)>-1) {
         self.iterate_over_wells(1, e.shiftKey);
       } else if (['ArrowUp', 'ArrowLeft'].indexOf(e.key)>-1) {
         self.iterate_over_wells(-1, e.shiftKey);
       }
-    })
+      // barcode scanner input
+      if (e.key=='Clear') {
+        scanning_bc_now = true;
+        bc_string = '';
+      } else if ((e.key=='Enter') && (scanning_bc_now)) {
+        console.log('bc scanned:', bc_string);
+        bcs_scanned.add(bc_string);
+        d3.selectAll('.SampleName_row_entry').classed('scanned_row', d => bcs_scanned.has(d['Sample_ID']));
+        scanning_bc_now = false;
+      } else if ((e.key != 'Shift') && (scanning_bc_now)) {
+        bc_string += e.key;
+      }
+    });
   }
 
   update_filtered_wells() {
@@ -801,28 +804,20 @@ class whooData {
   }
 }
 
-function submit_user_pass_form() {
+function setup_with_server() {
   whoo_username = d3.select('#auth_username').property('value');
   whoo_password = d3.select('#auth_password').property('value');
   d3.select('#inputfile').style('display', 'block');
   d3.select('#auth_popup').style('display', 'none');
+  whoo_use_server = true;
 }
 
-function setup(use_server=true) {
-  if (!use_server) {
-    whoo_use_server = false;
-    whoo_username = 'dummy';
-    whoo_password = 'dummy';
-  }
-  if (!whoo_username) { // if we're asking the user for the username / password
-    d3.select('#inputfile').style('display', 'none');
-    d3.select('#auth_popup').style('display', 'block');
-    d3.select('#auth_password').on("change", submit_user_pass_form); // fires when user presses enter
-    d3.select('#auth_submit').on("click", submit_user_pass_form);    // or they can click the button
-  } else {  // if it is already hard coded in above
-    d3.select('#inputfile').style('display', 'block');
-    d3.select('#auth_popup').style('display', 'none');
-  }
+function setup_without_server() {
+  whoo_username = '';
+  whoo_password = '';
+  d3.select('#inputfile').style('display', 'block');
+  d3.select('#auth_popup').style('display', 'none');
+  whoo_use_server = false;
 }
 
 function new_file_handler() {

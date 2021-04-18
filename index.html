@@ -18,7 +18,9 @@
   <link rel="icon" type="image/svg+xml" href="Favicon.svg">
 
 </head>
-<body onload="setup(false)">
+<body>
+  <div id="reload_button" onClick="window.location.reload();">Reload</div>
+  <div id="app_name_text">WHOOCKLE v1.1</div>
   <div id="whoo_everything">
     <input type="file" name="inputfile" id="inputfile" onchange="new_file_handler()">
     <div id="all_contents">
@@ -76,8 +78,9 @@
       <p>username</p><br />
       <input type="text" name="username" id="auth_username" class="form_text"/><br />
       <p>password</p><br />
-      <input type="password" name="password" id="auth_password" class="form_text"/><br />
-      <div id="auth_submit" class="whoo_button">Submit</div>
+      <input type="password" name="password" id="auth_password" class="form_text" onchange="setup_with_server()"/><br />
+      <div id="auth_submit" class="whoo_button" onclick="setup_with_server()">Submit</div>
+      <div id="auth_no_server" class="whoo_button" onclick="setup_without_server()">Run Without Server</div>
     </div>  
   </div>
 </body>

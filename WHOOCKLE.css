@@ -7,6 +7,25 @@ body {
   color: #EEE;
 }
 
+#app_name_text {
+  position: fixed;
+  top: 15px;
+  right: 15px;
+  font-size: 16px;
+}
+
+#reload_button {
+  position: fixed;
+  top: 15px;
+  left: 15px;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+#reload_button:hover {
+  opacity:0.6;
+}
+
 #whoo_everything {
   position: relative;
   width: 1200px;
@@ -18,7 +37,7 @@ body {
 #inputfile {
   position: absolute;
   top: 5px;
-  left: 50px;
+  left: 400px;
 }
 
 #all_contents {
@@ -80,10 +99,9 @@ body {
   left: 450px;
   width: 300px;
   top: 200px;
-  height: 200px;
   background-color: #555;
-  display: none;
   padding:20px;
+  background-color: #A85F00;
 }
 
 #auth_popup p {
@@ -420,6 +438,10 @@ body {
 
 .control_hidden_element {
   display: none;
+}
+
+.scanned_row {
+  opacity: 0.5;
 }
 
 /*#endregion*/
