@@ -332,9 +332,9 @@ class whooData {
       // Note: "Undetermined" CTs are NaN here. NaN compared to a number will always return false
       // Therefore all comparisons with CTs will ask if a CT is less than some threshold
       // CHECK 1: PTCs are NOT both NEG for N1
-      if ( (!(this.ptc_data[0]['N1 CT']<30)) && (!(this.ptc_data[1]['N1 CT']<30)) ) this.plate_errors.push('PLATE ERROR: Both PTCs N1 CT>30');
+      if ( (!(this.ptc_data[0]['N1 CT']<35)) && (!(this.ptc_data[1]['N1 CT']<35)) ) this.plate_errors.push('PLATE ERROR: Both PTCs N1 CT>35');
       // CHECK 2: PTCs are NOT both NEG for RDRP
-      if ( (!(this.ptc_data[0]['RDRP CT']<30)) && (!(this.ptc_data[1]['RDRP CT']<30)) ) this.plate_errors.push('PLATE ERROR: Both PTCs RDRP CT>30');
+      if ( (!(this.ptc_data[0]['RDRP CT']<35)) && (!(this.ptc_data[1]['RDRP CT']<35)) ) this.plate_errors.push('PLATE ERROR: Both PTCs RDRP CT>35');
       // CHECK 3: NTCs are both NOT POS for N1
       if ((this.ntc_data[0]['N1 CT']<38) || (this.ntc_data[1]['N1 CT']<38)) this.plate_errors.push('PLATE ERROR: At least one NTC N1 CT<38'); 
       // CHECK 3: NTCs are both NOT POS for RDRP
@@ -361,20 +361,20 @@ class whooData {
       if (d['Sample Name'].slice(0,3) == 'NTC') {
         // For the NTC to be valid, all 3 CTs must be undefined (asking that they are not <45 works in this case)
         d['RawCall'] = ( (d['N1 CT']<45) || (d['RDRP CT']<45) || (d['RNASEP CT']<45) ) ? 'Invalid' : 'Valid';
-        d['OverrideCall'] = d['RawCall'];   // Override call defaults to the RawCall, can be changed by the user if Override is true
-        d['FinalCall'] = d['RawCall'];      // FinalCall will be equal to RawCall when Override is false, and OverrideCall when Override is true
+        d['OverrideCall'] = d['RawCall'];   // Setting override even though overrides  aren't allowed for controls
+        d['FinalCall'] = d['RawCall'];      // FinalCall equal to RawCall for controls
       } else if (d['Sample Name'].slice(0,3) == 'PTC') {
-        // For the NTC to be valid, all 3 CTs must be <30
-        d['RawCall'] = ( (d['N1 CT']<30) || (d['RDRP CT']<30) || (d['RNASEP CT']<30) ) ? 'Valid' : 'Invalid';
-        d['OverrideCall'] = d['RawCall'];   // Override call defaults to the RawCall, can be changed by the user if Override is true
-        d['FinalCall'] = d['RawCall'];      // FinalCall will be equal to RawCall when Override is false, and OverrideCall when Override is true
+        // For the PTC to be valid, all 3 CTs must be <35
+        d['RawCall'] = ( (d['N1 CT']<35) && (d['RDRP CT']<35) && (d['RNASEP CT']<35) ) ? 'Valid' : 'Invalid';
+        d['OverrideCall'] = d['RawCall'];   // Setting override even though overrides  aren't allowed for controls
+        d['FinalCall'] = d['RawCall'];      // FinalCall equal to RawCall for controls
       } else { // Now starting the logic for non-control wells:
         if ( (d['N1 CT']<30) || (d['RDRP CT']<30) ) { 
           d['RawCall'] = 'Positive'; // If N1 CT < 30 OR RDRP CT < 30, call Positive
         } else if ( (d['N1 CT']<38) && (d['RDRP CT']<38) ) {
           d['RawCall'] = 'Positive'; // If N1 CT < 38 AND RDRP CT < 38, call Positive
-        } else if ( ( (!(d['N1 CT']<38)) && (!(d['RDRP CT']<38)) ) && (d['RNASEP CT']<34) ) {
-          d['RawCall'] = 'Negative'; // If N1 CT > 38 AND RDRP CT > 38 AND RNASEP CT < 34, call Negative
+        } else if ( ( (!(d['N1 CT']<38)) && (!(d['RDRP CT']<38)) ) && (d['RNASEP CT']<38) ) {
+          d['RawCall'] = 'Negative'; // If N1 CT > 38 AND RDRP CT > 38 AND RNASEP CT < 38, call Negative
         } else if ( (d['N1 CT']<38) || (d['RDRP CT']<38) ) {
           if (d['Retest']=='Retest B') {
             d['RawCall'] = 'Positive';          // Two retest B's in a row -> Positive 
