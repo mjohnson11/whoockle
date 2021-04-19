@@ -49,6 +49,19 @@ var whoo_username;
 var whoo_password;
 var whoo_use_server = true;
 
+function well_converter(well) {
+  /**
+   * Given a well number (1-384), gives the quadrant and 96 well (e.g. Q2_A6)
+   */
+  let z_well = parseInt(well)-1;
+  let row = Math.floor(z_well / 24);
+  let column = Math.floor(z_well % 24);
+  let q = (row % 2)*2 + (column % 2) + 1;
+  let use_row = Math.floor(row/2);
+  let use_col = Math.floor(column/2);
+  return 'Q'+String(q)+'_'+whoo_rows[use_row]+String(use_col+1);
+}
+
 class whooData {
   /**
    * This class holds all the data and variables associated with a single open file
@@ -270,6 +283,7 @@ class whooData {
     for (let group of d3.groups(this.raw_data['Results'], d => d.Well)) { // groups data by well number
       let rows = group[1];
       let tmp_obj = {'Well': group[0], 'Well Position': rows[0]['Well Position']};
+      tmp_obj['Well_96'] = well_converter(group[0]);
       if (this.retest_data) {
         if (!(tmp_obj['Well Position'] in this.retest_map)) continue; // exclude samples not in the json sample map
         tmp_obj['Retest'] = this.retest_map[tmp_obj['Well Position']][0];
@@ -438,7 +452,7 @@ class whooData {
         .on('click', function(event, d) { self.highlight_well(d.Well, event.shiftKey); });
 
     
-    d3.selectAll('.whoo_table_row').append('td').attr('class', 'Well_row_entry').html(d => d['Well Position']);
+    d3.selectAll('.whoo_table_row').append('td').attr('class', 'Well_row_entry').html(d => d['Well Position'] + " (" + d['Well_96'] + ")");
     d3.selectAll('.whoo_table_row').append('td').attr('class', 'Retest_row_entry').html(d => d['Retest']);
     d3.selectAll('.whoo_table_row').append('td').attr('class', 'SampleName_row_entry').html(function(d) {
       return (d['Sample Name'] == 'Sample 1') ? d['Sample_ID'] : d['Sample Name'];});
@@ -474,6 +488,7 @@ class whooData {
     d3.select('#next_well').on('click', function(e) { self.iterate_over_wells(1, e.shiftKey); });  // sets up listener for next button press
 
     d3.select('body').on('keydown', function(e) {
+      console.log(e.key);
       // table navigation with arrow keys
       if (['ArrowDown', 'ArrowRight'].indexOf(e.key)>-1) {
         self.iterate_over_wells(1, e.shiftKey);
