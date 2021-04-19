@@ -496,7 +496,7 @@ class whooData {
         self.iterate_over_wells(-1, e.shiftKey);
       }
       // barcode scanner input
-      if (e.key=='Clear') {
+      if (e.key=='Shift') {
         scanning_bc_now = true;
         bc_string = '';
       } else if ((e.key=='Enter') && (scanning_bc_now)) {
