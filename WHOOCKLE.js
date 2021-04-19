@@ -488,7 +488,6 @@ class whooData {
     d3.select('#next_well').on('click', function(e) { self.iterate_over_wells(1, e.shiftKey); });  // sets up listener for next button press
 
     d3.select('body').on('keydown', function(e) {
-      console.log(e.key);
       // table navigation with arrow keys
       if (['ArrowDown', 'ArrowRight'].indexOf(e.key)>-1) {
         self.iterate_over_wells(1, e.shiftKey);
