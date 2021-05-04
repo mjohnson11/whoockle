@@ -1,3 +1,5 @@
+// v1.2.0
+
 var whoo_holder;
 
 var whoo_DEBUG = false;
@@ -28,10 +30,17 @@ var whoo_export_map = {
 }
 
 // THE EXPORT MAPPING FOR CONTROLS IS WEIRD
-// Basically Positive means it worked (Valid based on logic in call_wells), Negative for Invalid
+// New as of v1.2: NTCs are NEGATIVE if Valid, PTCs are still POSITIVE if Valid
 var whoo_export_map_controls = {
-  'Invalid': 'NEGATIVE for SARS-CoV-2',
-  'Valid': 'POSITIVE for SARS-CoV-2'
+  'PTC': {
+    'Invalid': 'NEGATIVE for SARS-CoV-2',
+    'Valid': 'POSITIVE for SARS-CoV-2'
+  },
+  'NTC': {
+    'Invalid': 'POSITIVE for SARS-CoV-2',
+    'Valid': 'NEGATIVE for SARS-CoV-2'
+  }
+  
 }
 
 var bcs_scanned = new Set();
@@ -62,25 +71,53 @@ function well_converter(well) {
   return 'Q'+String(q)+'_'+whoo_rows[use_row]+String(use_col+1);
 }
 
+/*  --------------------------   */
+/*  |   MAIN CALLING LOGIC   |   */
+/*  --------------------------   */
+
+// Note: "Undetermined" CTs are NaN here. NaN compared to a number will always return false
+// Therefore all comparisons with CTs will ask if a CT is less than some threshold
+
+function ptc_valid(row) {
+  /* returns Valid or Invalid for PTC */
+  return ( (row['N1 CT']<=35) && (row['RDRP CT']<=35) && (row['RNASEP CT']<=35) ) ? 'Valid' : 'Invalid';
+}
+
+function ntc_valid(row) {
+  /* returns Valid or Invalid for NTC */
+  return ( (row['N1 CT']<=38) || (row['RDRP CT']<=38) || (row['RNASEP CT']<=38) ) ? 'Invalid' : 'Valid';
+}
+
+function call_one_well(row) {
+  /* Logic for all sample wells */
+  if ( (row['N1 CT']<=30) || (row['RDRP CT']<=30) ) { 
+    return 'Positive'; // If N1 CT <= 30 OR RDRP CT <= 30, call Positive
+  } else if ( (row['N1 CT']<=38) && (row['RDRP CT']<=38) ) {
+    return 'Positive'; // If N1 CT <= 38 AND RDRP CT <= 38, call Positive
+  } else if ( ( (!(row['N1 CT']<=38)) && (!(row['RDRP CT']<=38)) ) && (row['RNASEP CT']<=38) ) {
+    return 'Negative'; // If N1 CT > 38 AND RDRP CT > 38 AND RNASEP CT <= 38, call Negative
+  } else if ( (row['N1 CT']<=38) || (row['RDRP CT']<=38) ) {
+    if (row['Retest']=='Retest B') {
+      return 'Positive';          // Two retest B's in a row -> Positive 
+    } else if (row['Retest']=='Retest A') {
+      return 'Inconclusive';      // Retest A then Retest B -> Inconclusive
+    } else {
+      return 'Rerun-B';           // If N1 CT < 38 OR RDRP CT < 38 (and not already a retest), call Rerun-B
+    }
+  } else {
+    if ((row['Retest']=='Retest B') || (row['Retest']=='Retest A')) {
+      return 'Inconclusive';          // Retest A or B followed by Retest A -> Inconclusive
+    } else {
+      return 'Rerun-A';               // ELSE call Rerun-A (if not already a retest)
+    }
+  }
+}
+
 class whooData {
   /**
    * This class holds all the data and variables associated with a single open file
    */
   constructor() {
-  }
-  
-  //#region FILE/DATA HANDLING FUNCTIONS
-  
-  load_from_save() {
-    /**
-     * Possible addition: A function for taking already processed data and re-loading it
-     */
-  }
-
-  save() {
-    /**
-     * Possible addition: A function for saving data in a format that can be reopened
-     */
   }
 
   format_for_export() {
@@ -95,7 +132,7 @@ class whooData {
     for (let d of this.main_data) {
       let tmp_row = {'Position': d['Well Position']};
       if (d.is_control) {
-        tmp_row['InterpretiveResult'] = whoo_export_map_controls[d['FinalCall']];
+        tmp_row['InterpretiveResult'] = whoo_export_map_controls[d['Sample Name'].slice(0,3)][d['FinalCall']];
       } else {
         tmp_row['InterpretiveResult'] = whoo_export_map[d['FinalCall']];
       }
@@ -305,7 +342,7 @@ class whooData {
       }
       this.main_data.push(tmp_obj)
     }
-    this.check_plate_data(this.raw_data['Sample Setup']);
+    this.check_plate_data();
     this.call_wells();
     this.filtered_data = this.main_data;
     this.update_filtered_wells()
@@ -315,7 +352,7 @@ class whooData {
     d3.select("#whoo_export").on('click', function() { self.export(); });
   }
 
-  check_plate_data(sample_data) {
+  check_plate_data() {
     /**
      * Checks the control data for the plate
      * - Checks if the control samples are in the expected wells 
@@ -333,31 +370,33 @@ class whooData {
     
     // Checking they are in the expected spots, will raise warnings if not
     if (!((this.ptc_well_positions.indexOf('O23')>-1) && (this.ptc_well_positions.indexOf('P24')>-1) && (this.ptc_well_positions.length==2))) {
-      this.plate_warnings.push('WARNING: Unexpected plate layout, PTCs are at Wells: ' + this.ptc_well_positions.join(', '));
+      this.plate_errors.push('PLATE ERROR: Unexpected plate layout, PTCs are at Wells: ' + this.ptc_well_positions.join(', '));
     }
     if (!((this.ntc_well_positions.indexOf('O24')>-1) && (this.ntc_well_positions.indexOf('P23')>-1) && (this.ntc_well_positions.length==2))) {
-      this.plate_warnings.push('WARNING: Unexpected plate layout, NTCs are at Wells: ' + this.ntc_well_positions.join(', '));
+      this.plate_errors.push('PLATE ERROR: Unexpected plate layout, NTCs are at Wells: ' + this.ntc_well_positions.join(', '));
     }
     
     // Checking for plate errors
     if (!((this.ptc_well_positions.length==2) && (this.ntc_well_positions.length==2))) {
       this.plate_errors.push('PLATE ERROR: Could not find 2 PTCs and/or 2 NTCs'); // Did not find control wells...
     } else {
-      // Note: "Undetermined" CTs are NaN here. NaN compared to a number will always return false
-      // Therefore all comparisons with CTs will ask if a CT is less than some threshold
-      // CHECK 1: PTCs are NOT both NEG for N1
-      if ( (!(this.ptc_data[0]['N1 CT']<35)) && (!(this.ptc_data[1]['N1 CT']<35)) ) this.plate_errors.push('PLATE ERROR: Both PTCs N1 CT>35');
-      // CHECK 2: PTCs are NOT both NEG for RDRP
-      if ( (!(this.ptc_data[0]['RDRP CT']<35)) && (!(this.ptc_data[1]['RDRP CT']<35)) ) this.plate_errors.push('PLATE ERROR: Both PTCs RDRP CT>35');
-      // CHECK 3: NTCs are both NOT POS for N1
-      if ((this.ntc_data[0]['N1 CT']<38) || (this.ntc_data[1]['N1 CT']<38)) this.plate_errors.push('PLATE ERROR: At least one NTC N1 CT<38'); 
-      // CHECK 3: NTCs are both NOT POS for RDRP
-      if ((this.ntc_data[0]['RDRP CT']<38) || (this.ntc_data[1]['RDRP CT']<38)) this.plate_errors.push('PLATE ERROR: At least one NTC RDRP CT<38'); 
+      let ptc_results = this.ptc_data.map(ptc_valid);
+      let ntc_results = this.ntc_data.map(ntc_valid);
+      if ((ptc_results[0]=='Invalid') && (ptc_results[1]=='Invalid') ) {
+        this.plate_errors.push('PLATE FAILURE: Both PTCs are invalid');
+      } else if (ptc_results.indexOf('Invalid')>-1) {
+        this.plate_errors.push('SUPERVISOR CHECK REQUIRED: One PTC is invalid');
+      }
+      if ((ntc_results[0]=='Invalid') && (ntc_results[1]=='Invalid') ) {
+        this.plate_errors.push('PLATE FAILURE: Both NTCs are invalid');
+      } else if (ntc_results.indexOf('Invalid')>-1) {
+        this.plate_errors.push('SUPERVISOR CHECK REQUIRED: One NTC is invalid');
+      }
     }
 
     d3.select("#plate_error_text").html(self.plate_errors.join('<br />') + '<br />' + self.plate_warnings.join('<br />'));
     d3.select("#plate_fail_x_out").on('click', function() { d3.select("#plate_fail_popup").style('display', 'none'); } );
-    if ((this.plate_errors.length>0) || (this.plate_warnings.length>0)) d3.select("#plate_fail_popup").style('display', 'block');
+    if (this.plate_errors.length>0) d3.select("#plate_fail_popup").style('display', 'block');
 
   }
 
@@ -368,42 +407,16 @@ class whooData {
     if (whoo_DEBUG) console.log('in call_wells()');
     if (whoo_DEBUG) console.log('Plate failures and warnings', this.plate_failures, this.loading_errors);
     for (let d of this.main_data) {
-      // Note: "Undetermined" CTs are NaN here. NaN compared to a number will always return false
-      // Therefore all comparisons with CTs will ask if a CT is less than some threshold
-
-      // Specific logic for controls:
-      if (d['Sample Name'].slice(0,3) == 'NTC') {
-        // For the NTC to be valid, all 3 CTs must be undefined (asking that they are not <45 works in this case)
-        d['RawCall'] = ( (d['N1 CT']<45) || (d['RDRP CT']<45) || (d['RNASEP CT']<45) ) ? 'Invalid' : 'Valid';
+      if (d['Sample Name'].slice(0,3) == 'NTC') { // Calling controls Valid/Invalid
+        d['RawCall'] = ntc_valid(d);
         d['OverrideCall'] = d['RawCall'];   // Setting override even though overrides  aren't allowed for controls
         d['FinalCall'] = d['RawCall'];      // FinalCall equal to RawCall for controls
       } else if (d['Sample Name'].slice(0,3) == 'PTC') {
-        // For the PTC to be valid, all 3 CTs must be <35
-        d['RawCall'] = ( (d['N1 CT']<35) && (d['RDRP CT']<35) && (d['RNASEP CT']<35) ) ? 'Valid' : 'Invalid';
+        d['RawCall'] = ptc_valid(d);
         d['OverrideCall'] = d['RawCall'];   // Setting override even though overrides  aren't allowed for controls
         d['FinalCall'] = d['RawCall'];      // FinalCall equal to RawCall for controls
       } else { // Now starting the logic for non-control wells:
-        if ( (d['N1 CT']<30) || (d['RDRP CT']<30) ) { 
-          d['RawCall'] = 'Positive'; // If N1 CT < 30 OR RDRP CT < 30, call Positive
-        } else if ( (d['N1 CT']<38) && (d['RDRP CT']<38) ) {
-          d['RawCall'] = 'Positive'; // If N1 CT < 38 AND RDRP CT < 38, call Positive
-        } else if ( ( (!(d['N1 CT']<38)) && (!(d['RDRP CT']<38)) ) && (d['RNASEP CT']<38) ) {
-          d['RawCall'] = 'Negative'; // If N1 CT > 38 AND RDRP CT > 38 AND RNASEP CT < 38, call Negative
-        } else if ( (d['N1 CT']<38) || (d['RDRP CT']<38) ) {
-          if (d['Retest']=='Retest B') {
-            d['RawCall'] = 'Positive';          // Two retest B's in a row -> Positive 
-          } else if (d['Retest']=='Retest A') {
-            d['RawCall'] = 'Inconclusive';      // Retest A then Retest B -> Inconclusive
-          } else {
-            d['RawCall'] = 'Rerun-B';           // If N1 CT < 38 OR RDRP CT < 38 (and not already a retest), call Rerun-B
-          }
-        } else {
-          if ((d['Retest']=='Retest B') || (d['Retest']=='Retest A')) {
-            d['RawCall'] = 'Inconclusive';          // Retest A or B followed by Retest A -> Inconclusive
-          } else {
-            d['RawCall'] = 'Rerun-A';               // ELSE call Rerun-A (if not already a retest)
-          }
-        }
+        d['RawCall'] = call_one_well(d);
         if (this.plate_errors.length>0) {     // If there are any plate-failure errors, set everything to Rerun-A (by override)
           d['Override'] = true;
           d['OverrideCall'] = 'Rerun-A';
