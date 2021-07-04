@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <!-- FONT
+  –––––––––––––––––––––––––––––––––––––––––––––––––– -->
+  <link href="https://fonts.googleapis.com/css?family=Crimson+Text&display=swap" rel="stylesheet" type="text/css">
+
+
+  <!-- SLICK GRID -->
+  <script src="SlickGrid-2.4.38/lib/jquery-1.12.4.min.js"></script>
+  <script src="SlickGrid-2.4.38/lib/jquery.event.drag-2.3.0.js"></script>
+  <link rel="stylesheet" href="SlickGrid-2.4.38/css/smoothness/jquery-ui-1.11.3.custom.css" type="text/css"/>
+  <link rel="stylesheet" href="SlickGrid-2.4.38/slick.grid.css" type="text/css"/>
+  <script src="SlickGrid-2.4.38/slick.core.js"></script>
+  <script src="SlickGrid-2.4.38/slick.grid.js"></script>
+  
+  <!-- CSS
+  –––––––––––––––––––––––––––––––––––––––––––––––––– -->
+  <link rel="stylesheet" href="WHOOCKLE.css">
+  <link rel="stylesheet" href="reporting.css">
+
+  <!-- JS
+  –––––––––––––––––––––––––––––––––––––––––––––––––– -->
+  <script src="https://d3js.org/d3.v6.min.js"></script>
+  <script src="reporting.js"></script>
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/svg+xml" href="Favicon.svg">
+
+</head>
+<body>
+  <div id="whoo_everything">
+    <div id="reload_button" onClick="window.location.reload();">Reload</div>
+    <div id="app_name_text">HUCL reporting</div>
+    <input type="file" name="inputfile" id="inputfile" onchange="new_stats_file()">
+    <div id="all_contents">
+      <div id="plate_title">Test result summary</div>
+      <div id="org_checkboxes"></div>
+      <div id="date_pickers">
+        <label for="start_date">Start date:</label>
+        <input type="date" id="start_date" name="start_date" onchange="show_the_stats()">
+        <label for="end_date">End date:</label>
+        <input type="date" id="end_date" name="end_date" onchange="show_the_stats()">
+      </div>
+      <div id="stats_zone">
+        <div id="total_text"></div>
+      </div>
+      <div id="results_table"></div>
+
+    </div> 
+  </div>
+</body>
+</html>

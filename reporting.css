@@ -1,0 +1,68 @@
+/* Main stylesheet */
+
+#inputfile {
+  display: block;
+  top: 55px;
+}
+
+#org_checkboxes {
+  position: absolute;
+  left: 200px;
+  top: 100px;
+  width: 300px;
+}
+
+#stats_zone {
+  position: absolute;
+  left: 500px;
+  top: 100px;
+  width: 500px;
+}
+
+#date_pickers {
+  position: absolute;
+  left: 200px;
+  top:300px;
+}
+
+#results_table {
+  position: absolute;
+  left: 200px;
+  top: 400px;
+  height: 300px;
+  width: 800px;
+}
+
+.results_div {
+  display: block;
+  cursor: default;
+}
+
+.results_div:hover {
+  opacity: 0.8;
+  background-color: #333333; 
+}
+
+.highlighted_res_div {
+  background-color: #777777;
+}
+
+.results_div {
+  position: relative;
+  height: 50px;
+}
+
+.results_bar {
+  position: absolute;
+  top: 10px;
+  height: 30px;
+  width:100px;
+  left: 20px;
+}
+
+.results_text {
+  position: absolute;
+  left: 130px;
+  height: 30px;
+  vertical-align: middle;
+}
