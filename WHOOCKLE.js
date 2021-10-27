@@ -471,7 +471,7 @@ class whooData {
       return (d['Sample Name'] == 'Sample 1') ? d['Sample_ID'] : d['Sample Name'];});
     d3.selectAll('.whoo_table_row').append('td').attr('class', 'RawCall_row_entry').html(d => d.RawCall);
     let override_entry = d3.selectAll('.whoo_table_row').append('td').attr('class', 'Override_row_entry');
-    d3.selectAll('.whoo_table_row').append('td').attr('class', 'CT_row_entry').html(d => (d['N1 CT']) ? d['N1 CT'].toFixed(1) : 'Und.'); // Or (||) override makes NaN show up as -
+    d3.selectAll('.whoo_table_row').append('td').attr('class', 'CT_row_entry').html(d => (d['N1 CT']) ? d['N1 CT'].toFixed(1) : 'Und.'); // makes NaN show up as Und.
     d3.selectAll('.whoo_table_row').append('td').attr('class', 'CT_row_entry').html(d => (d['RDRP CT']) ? d['RDRP CT'].toFixed(1) : 'Und.');
     d3.selectAll('.whoo_table_row').append('td').attr('class', 'CT_row_entry').html(d => (d['RNASEP CT']) ? d['RNASEP CT'].toFixed(1) : 'Und.');
     override_entry.append('input')
