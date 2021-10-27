@@ -85,7 +85,7 @@ function ptc_valid(row) {
 
 function ntc_valid(row) {
   /* returns Valid or Invalid for NTC */
-  return ( (row['N1 CT']<=38) || (row['RDRP CT']<=38) || (row['RNASEP CT']<=38) ) ? 'Invalid' : 'Valid';
+  return ( (row['N1 CT']<=44) || (row['RDRP CT']<=44) || (row['RNASEP CT']<=44) ) ? 'Invalid' : 'Valid';
 }
 
 function call_one_well(row) {
