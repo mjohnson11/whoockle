@@ -363,11 +363,9 @@ class whooData {
      * - Checks if the control samples are in the expected wells 
      * - Checks if EITHER of both the PCTs failed (were negative, CT>30) for either N1 or RDRP
      * - Checks if BOTH of the NTCs failed (were positive, CT<38) for either N1 or RDRP
-     * All of these checks are recorded in an array (this.plate_failures)
      */
     let self = this;
     if (whoo_DEBUG) console.log('in check_plate_data()');
-    this.plate_failures = [];
     this.ntc_data = this.main_data.filter(row => (row['Sample Name'].slice(0,3) == 'NTC'));
     this.ptc_data = this.main_data.filter(row => (row['Sample Name'].slice(0,3) == 'PTC'));
     this.ntc_well_positions = d3.map(this.ntc_data, row => row['Well Position']);
@@ -407,12 +405,12 @@ class whooData {
       }
     }
     if (supervisory_check_wells.length > 0) {
-      this.plate_errors.push('SUPERVISOR CHECK REQUIRED. The following wells have an N1 or RDRP CT >=36 (indicated by blue outline): ' + supervisory_check_wells.join(', '));
+      this.plate_warnings.push('SUPERVISOR CHECK REQUIRED. The following wells have an N1 or RDRP CT >=36 (indicated by blue outline): ' + supervisory_check_wells.join(', '));
     }
 
     d3.select("#plate_error_text").html(self.plate_errors.join('<br />') + '<br />' + self.plate_warnings.join('<br />'));
     d3.select("#plate_fail_x_out").on('click', function() { d3.select("#plate_fail_popup").style('display', 'none'); } );
-    if (this.plate_errors.length>0) d3.select("#plate_fail_popup").style('display', 'block');
+    if ((this.plate_errors.length>0) || (this.plate_warnings.length>0)) d3.select("#plate_fail_popup").style('display', 'block');
 
   }
 
@@ -421,7 +419,7 @@ class whooData {
      * Calls each well as Positive, Negative, Inconclusive, Rerun-A, or Rerun-B
      */
     if (whoo_DEBUG) console.log('in call_wells()');
-    if (whoo_DEBUG) console.log('Plate failures and warnings', this.plate_failures, this.loading_errors);
+    if (whoo_DEBUG) console.log('Plate failures and warnings', this.plate_errors, this.plate_warnings);
     for (let d of this.main_data) {
       if (d['Sample Name'].slice(0,3) == 'NTC') { // Calling controls Valid/Invalid
         d['RawCall'] = ntc_valid(d);
@@ -766,7 +764,7 @@ class whooData {
       .attr('cx', d => self.column_scale(parseInt(d['Well Position'].slice(1,))))
       .attr('cy', d => self.row_scale(d['Well Position'][0])+(row_range[1]-row_range[0])/32)
       .attr('r', 6)
-      .attr('stroke', d => d['Supervisory_check'] ? '#00F' : '#EEE')
+      .attr('stroke', d => d['Supervisory_check'] ? '#618BE0' : '#EEE')
       .attr('fill', d => whoo_colors[d.FinalCall].replace('33%', '45%'));
 
     d3.select('#show_controls')
