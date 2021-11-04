@@ -113,6 +113,11 @@ function call_one_well(row) {
   }
 }
 
+function supervisory_check(row) {
+  /* Logic for supervisory check, which will appear if a well has N1 or RDRP >= 36 (but not undetermined) */
+  return ( (row['N1 CT']>=36) || (row['RDRP CT']>=36) );
+}
+
 class whooData {
   /**
    * This class holds all the data and variables associated with a single open file
@@ -392,6 +397,17 @@ class whooData {
       } else if (ntc_results.indexOf('Invalid')>-1) {
         this.plate_errors.push('SUPERVISOR CHECK REQUIRED: One NTC is invalid');
       }
+    }
+    // checking for supervisory checks, which happen on all wells with N1 or RDRP CT >= 36
+    let supervisory_check_wells = [];
+    for (let d of this.main_data) {
+      d['Supervisory_check'] = supervisory_check(d);
+      if (d['Supervisory_check']) {
+        supervisory_check_wells.push(d['Well Position']);
+      }
+    }
+    if (supervisory_check_wells.length > 0) {
+      this.plate_errors.push('SUPERVISOR CHECK REQUIRED. The following wells have an N1 or RDRP CT >=36 (indicated by blue outline): ' + supervisory_check_wells.join(', '));
     }
 
     d3.select("#plate_error_text").html(self.plate_errors.join('<br />') + '<br />' + self.plate_warnings.join('<br />'));
@@ -746,12 +762,12 @@ class whooData {
 
     this.svg.selectAll('.svg_data')
       .append('circle')
-      .attr('class', 'well_icon')
-        .attr('cx', d => self.column_scale(parseInt(d['Well Position'].slice(1,))))
-        .attr('cy', d => self.row_scale(d['Well Position'][0])+(row_range[1]-row_range[0])/32)
-        .attr('r', 6)
-        .attr('stroke', '#EEE')
-        .attr('fill', d => whoo_colors[d.FinalCall].replace('33%', '45%'));
+      .attr('class', d => 'well_icon ' + (d['Supervisory_check'] ? 'check_well' : '') )
+      .attr('cx', d => self.column_scale(parseInt(d['Well Position'].slice(1,))))
+      .attr('cy', d => self.row_scale(d['Well Position'][0])+(row_range[1]-row_range[0])/32)
+      .attr('r', 6)
+      .attr('stroke', d => d['Supervisory_check'] ? '#00F' : '#EEE')
+      .attr('fill', d => whoo_colors[d.FinalCall].replace('33%', '45%'));
 
     d3.select('#show_controls')
       .on('click', function() {

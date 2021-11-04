@@ -486,6 +486,10 @@ body {
   opacity: 1;
 }
 
+.check_well {
+  stroke-width: 2px;
+}
+
 .hovered_data .well_icon {
   stroke-width: 1px;
 }
